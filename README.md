@@ -1,4 +1,4 @@
-# Movie Explorer
+# MovieExplorer
 
 Mobile app (React Native CLI + TypeScript) that consumes the [TMDB API](https://developer.themoviedb.org/docs/getting-started) to browse popular movies, search by title and see movie details. Runs on Android and iOS.
 
@@ -37,9 +37,10 @@ Follow the official [React Native environment setup](https://reactnative.dev/doc
 cp .env.example .env
 ```
 
-Edit `.env` and set your token:
+Edit `.env` and set your token (the base URL is already filled in `.env.example`):
 
 ```
+TMDB_BASE_URL=https://api.themoviedb.org/3
 TMDB_ACCESS_TOKEN=your_api_read_access_token
 ```
 
@@ -92,12 +93,10 @@ The app must build and run without errors on both platforms.
 | `pnpm lint:check` | ESLint (no auto-fix, fails on warnings) |
 | `pnpm types` | TypeScript check (`tsc --noEmit`) |
 | `pnpm pr:check` | `lint:check` + `types` + `test` (must pass before opening a PR) |
-| `pnpm i18n` | Extract translation keys |
-
 ## Troubleshooting
 
 - **Metro cache issues:** `pnpm start --reset-cache`
 - **Android build fails after dependency changes:** `cd android && ./gradlew clean && cd ..`
 - **iOS build fails after dependency changes:** `cd ios && pod install --repo-update && cd ..`
-- **"Missing environment variable" at startup:** check that `.env` exists, contains `TMDB_ACCESS_TOKEN`, and that you rebuilt the app.
+- **"Missing environment variable" at startup:** check that `.env` exists, contains `TMDB_BASE_URL` and `TMDB_ACCESS_TOKEN`, and that you rebuilt the app.
 - **TMDB returns 401:** the token is wrong or you used the short API key instead of the Read Access Token.

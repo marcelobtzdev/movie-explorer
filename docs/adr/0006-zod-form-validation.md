@@ -9,7 +9,7 @@ The search field needs runtime validation with localized messages alongside Reac
 
 ## Decision
 
-Use Zod as the schema library, integrated with React Hook Form via zodResolver from @hookform/resolvers/zod. Each form has a [form].schema.ts exporting the schema, the inferred type (z.infer<typeof Schema>), the resolver and a DefaultValues constant. Error messages use i18n.t('key', 'default value'). Zod also validates environment variables in src/constants/env.ts.
+Use Zod as the schema library, integrated with React Hook Form via zodResolver from @hookform/resolvers/zod. Each form has a [form].schema.ts exporting the schema, the inferred type (z.infer<typeof Schema>), the resolver and a DefaultValues constant. Error messages come from the Spanish text constants of the feature (strings.ts). Zod also validates environment variables in src/constants/env.ts.
 
 ## Consequences
 

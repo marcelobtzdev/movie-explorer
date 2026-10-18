@@ -19,11 +19,11 @@ Templates requiring follow-up: none — this command does not modify dependent t
 Follow-up TODOs: none.
 -->
 
-# Movie Explorer Constitution
+# MovieExplorer Constitution
 
 ## Project Context and Scope
 
-Movie Explorer is a mobile app that consumes the TMDB (The Movie Database) API and presents
+MovieExplorer is a mobile app that consumes the TMDB (The Movie Database) API and presents
 movie information clearly and efficiently. It is a technical assessment: it demonstrates good
 mobile-development practices and an efficient, scalable app.
 
@@ -37,25 +37,76 @@ on both.
 
 The current functional scope is the following:
 
-1. **Movie list**: a list of movies from the TMDB endpoint `GET /movie/popular`. Each item
-   shows the poster image, the title and the rating (`vote_average`, shown with one decimal).
+1. **Movie list**: a list of movies from the TMDB endpoint `GET /movie/popular`. Each grid
+   item shows the poster image, the rating badge (`vote_average`, shown with one decimal), the
+   title and a footer with the release year (from `release_date`) and the genre names, in the
+   form "2023 • Acción / Aventura". Genre names come from `GET /genre/movie/list`, which is
+   requested before the list and resolved by genre id (see Principle III).
 2. **Movie detail**: tapping an item opens a detail screen with a higher-resolution poster
    image, title, synopsis (`overview`), genres and release date. Data comes from
    `GET /movie/{movieId}`.
 3. **Search**: a search bar on the list screen searches movies by title with
    `GET /search/movie`. An empty search shows the popular list again.
 4. **UI states**: loading, error and empty list are visible to the user on every data-driven
-   screen.
+   screen. While the first batch loads, the movies screen shows a full-screen skeleton.
+5. **Main screen layout**: the movies screen has a header with the visible app name
+   "MovieExplorer", the subtitle of the active category and a static avatar; category tabs
+   (Populares, Mejor Valoradas, En Cartelera); a featured card showing the first movie of the
+   list (wide image, rating, release year and genre names, plus the "#1 TENDENCIA" label); the
+   section title "Películas Populares" followed by the grid with the remaining movies; and a
+   bottom menu (Populares, Cartelera, Mejor Valoradas, Favoritos). Only Populares is
+   functional: the other category tabs and bottom-menu items are visual only, do nothing when
+   pressed and are exposed to accessibility as unavailable. The visible app name
+   "MovieExplorer" is also the app display name.
 
 ### Not in the current scope
 
 The following are not part of the current scope. They can be added later when requirements
 change, through a spec and a constitution amendment: TV series, user accounts or
-authentication, favorites/watchlist, persisted or offline storage of app data, a
-category/endpoint selector, genre filters, sorting, pull-to-refresh,
-cast/crew/trailers/reviews/recommendations, share, dark mode or theme switching, a language
-switcher, push notifications, analytics, crash reporting, deep links, tablet-specific layouts,
-and animations beyond functional feedback.
+authentication, favorites/watchlist, persisted or offline storage of app data, functional
+category selection beyond Populares, genre filters, sorting, pull-to-refresh,
+cast/crew/trailers/reviews/recommendations, share, theme switching (the app uses a single
+dark theme), a language switcher, push notifications, analytics, crash reporting, deep links,
+tablet-specific layouts, and animations beyond functional feedback.
+
+Also not in the current scope, because they arrive with later specs or are not needed:
+the search bar and filters (they arrive with the search spec), a grid/list view toggle,
+featured-card actions (detail button, save, share), bookmark icons, movie runtime, and any
+extra content in the footer of grid cards (labels such as "IMAX" or "OSCAR WINNER", arrows or
+call-to-action icons): the card footer contains only the release year and the genre names.
+
+### Technology stack
+
+The stack below is the reference for every plan. Each need is covered by the package listed;
+versions are the latest stable release compatible with the React Native version chosen at
+scaffolding time (the plan records the exact versions in `research.md`). Other packages can be
+added following the dependency rule of Principle XII.
+
+| Need | Package or approach |
+|---|---|
+| App framework | `react-native` (CLI, New Architecture, Hermes), `react`, TypeScript strict |
+| Navigation | `@react-navigation/native`, `@react-navigation/native-stack`, `react-native-screens`, `react-native-safe-area-context` |
+| Server state and pagination | `@tanstack/react-query` v5 (`useInfiniteQuery`) |
+| Client state | `zustand` v5 |
+| HTTP | `axios` |
+| Validation | `zod` (installed from the start: environment validation) |
+| Forms | `react-hook-form`, `@hookform/resolvers` (installed when the first form exists, with the search spec) |
+| Environment variables | `react-native-config` + Zod validation |
+| Lists | `@shopify/flash-list` v2 |
+| Images | React Native `Image` (with `Image.prefetch`), custom `Poster` atom with placeholder |
+| Skeleton loading | `moti` (`moti/skeleton`) on `react-native-reanimated` (+ `react-native-worklets` when required), wrapped by the `Skeleton` atom (ADR-0012) |
+| Icons | Emoji glyphs and text/`View` shapes (no package) |
+| Gradients | `react-native-linear-gradient` (required by the Moti skeleton; also used for the featured-card overlay), wrapped in `vendors/linear-gradient` |
+| Connectivity | `@react-native-community/netinfo` |
+| Texts | Spanish (es-PY) text constants in `src/constants/strings.ts` and `src/features/[feature]/constants/strings.ts`; no internationalization library |
+| Styling and components | Custom components with `StyleSheet.create` and `src/theme` tokens |
+| Unit and component tests | `jest` (`react-native` preset), `@testing-library/react-native` |
+| Lint and format | `eslint` (`@react-native` config, `eslint-plugin-perfectionist`), `prettier` |
+| Git hooks | `husky`, `lint-staged`, `@commitlint/cli`, `@commitlint/config-conventional` |
+| Production console removal | `babel-plugin-transform-remove-console` |
+| Path alias | `babel-plugin-module-resolver` + `tsconfig` paths |
+| Dev debugging | `reactotron-react-native` (dev only) |
+| Package manager | `pnpm` with `node-linker=hoisted` |
 
 ### Priorities when trade-offs arise
 
@@ -95,8 +146,7 @@ movie-explorer/
 │   ├── shared/         # Cross-feature types and constants
 │   ├── utils/          # Pure utility functions
 │   ├── constants/      # App-level constants (env, TMDB, list tuning)
-│   ├── assets/         # Images, fonts
-│   └── i18n/           # Internationalization
+│   └── assets/         # Images, fonts
 ├── android/ ios/       # Native projects (React Native CLI)
 ├── docs/adr/           # Architecture Decision Records (only documentation folder)
 └── scripts/            # Build and maintenance scripts
@@ -174,6 +224,8 @@ Rules:
   `as const`) and used for every navigation call.
 - Navigation is fully typed through `RootStackParamList` (typed `useNavigation` / route props).
 - Screens receive only primitive params (`movieId`); the detail screen fetches its own data.
+- The category tabs and the bottom menu are custom visual components rendered by the Movies
+  screen, not React Navigation navigators; navigation remains one native stack.
 
 ```ts
 // ✅ correct
@@ -208,6 +260,10 @@ export const moviesKeys = {
   popular: () => [...moviesKeys.all, 'popular'] as const,
   search: (term: string) => [...moviesKeys.all, 'search', term] as const,
 }
+export const genresKeys = {
+  all: ['genres'] as const,
+  movie: () => [...genresKeys.all, 'movie'] as const,
+}
 export const movieDetailKeys = {
   all: ['movie-detail'] as const,
   detail: (movieId: number) => [...movieDetailKeys.all, movieId] as const,
@@ -229,6 +285,19 @@ export const moviesService = {
 
 Hook (`use-[feature].ts`): thin wrapper around `useQuery` / `useInfiniteQuery` connecting keys
 and service. The list uses `useInfiniteQuery` with `getNextPageParam` and `initialPageParam`.
+
+**Genres**: the genre catalog is small (about 20 entries), so it is fetched once with
+`GET /genre/movie/list` (`genres.service.ts`, `use-movie-genres.ts` in the `genres` feature
+slice) **before** the movie list: the popular-movies query has `enabled: genresQuery.isSuccess`,
+so the first batch is requested after the genres arrive. The genres query uses a long cache
+(`staleTime` and `gcTime` from `src/constants/query.ts`, 24 hours), since the catalog almost
+never changes. The model is `Genre { genreId, name }`. Movies keep only `genreIds`; the screen
+builds a lookup once per genres response (`useMemo`, a `Map` by `genreId`) and resolves names
+with `getGenreNames(genreIds, lookup, limit)` (pure util: ids without a match are skipped).
+Components receive the already-resolved names as props. Genre loading and genre errors are part
+of the screen's initial states: while genres or the first batch load the screen shows the
+skeleton; if the genres request fails, the screen shows the initial error state and "Reintentar"
+re-requests the failed query (genres first, then the list).
 
 The `QueryClient` is configured in `src/vendors/react-query/client.ts`, with:
 
@@ -285,7 +354,8 @@ Store inventory:
 The only form is the search field. It uses React Hook Form for state and Zod for the schema,
 bridged with `zodResolver` from `@hookform/resolvers/zod`. Each schema file
 (`[form].schema.ts`) exports: the schema, the inferred TypeScript type (`z.infer`), the
-resolver, and the default form values. Error messages use `i18n.t('key', 'default value')`.
+resolver, and the default form values. Error messages come from the Spanish text constants
+(`src/features/[feature]/constants/strings.ts`).
 
 ```ts
 // src/features/movies/schemas/search.schema.ts
@@ -293,7 +363,7 @@ export const SearchSchema = z.object({
   query: z
     .string()
     .trim()
-    .max(100, i18n.t('search.query.maxLength', 'El texto es demasiado largo.')),
+    .max(100, SEARCH_STRINGS.maxLength),
 })
 export type SearchFormData = z.infer<typeof SearchSchema>
 export const resolver = zodResolver(SearchSchema)
@@ -325,12 +395,12 @@ Atomic Design is used for shared components in `src/components/`:
 
 | Level | Folder | Examples | Description |
 |---|---|---|---|
-| Atom | `atoms/` | Button, Text, TextInput, Poster, Rating, Icon | Primitive, indivisible UI elements |
-| Molecule | `molecules/` | SearchField, EmptyState, ErrorState, LoadingIndicator | Composed atoms, still generic |
-| Organism | `organisms/` | NetworkErrorOverlay, ServerErrorOverlay, Toast | Complex components with internal logic |
+| Atom | `atoms/` | Button, Text, TextInput, Poster, Rating, Icon, Avatar, Chip, Skeleton | Primitive, indivisible UI elements (`Skeleton` wraps Moti, ADR-0012) |
+| Molecule | `molecules/` | SearchField, EmptyState, ErrorState, LoadingIndicator, CategoryTabs | Composed atoms, still generic |
+| Organism | `organisms/` | Header, BottomMenu, NetworkErrorOverlay, ServerErrorOverlay, Toast | Complex components with internal logic (`BottomMenu` is visual only) |
 | Template | `templates/` | ScreenContainer, ErrorBoundary | Page-level layouts and structural wrappers |
 
-Feature-specific components (e.g., `MovieCard`, `MovieGenres`) live in
+Feature-specific components (e.g., `FeaturedMovieCard`, `MovieCard`, `MoviesSkeleton`) live in
 `src/features/[feature]/components/`. Each component lives in its own folder with co-located
 styles and tests:
 
@@ -344,7 +414,7 @@ components/atoms/Button/
 
 Styles are defined with `StyleSheet.create` (inline styles are flagged by
 `react-native/no-inline-styles`) and take colors, spacing and font sizes from `designSystem`.
-There is a single light theme.
+There is a single dark theme.
 
 Design system tokens in `src/theme/`:
 
@@ -355,23 +425,53 @@ Design system tokens in `src/theme/`:
 | `typography.ts` | `typography` | Font families and sizes |
 | `design-system.ts` | `designSystem` | Composed object `{ colors, spacing, typography }` |
 
+Color values of the dark theme:
+
+| Token | Value |
+|---|---|
+| `primary.main` / `primary.contrast` | `#D93025` / `#FFFFFF` |
+| `accent` (stars, active bottom-menu item) | `#FBBF24` |
+| `background.base` (screens) | `#0F1219` |
+| `background.surface` (cards) | `#1A1D26` |
+| `background.elevated` (chips, inactive tabs) | `#242834` |
+| `text.primary` / `text.secondary` / `text.onPrimary` | `#E7E7EE` / `#B8A4A0` / `#FFFFFF` |
+| `border` | `#2A2E3A` |
+| `rating.background` | `rgba(15, 18, 25, 0.8)` with `text.primary` text |
+| `skeleton.base` / `skeleton.highlight` | `#1E222C` / `#2A2F3C` |
+| `status.error` / `status.warning` / `status.success` | `#F87171` / `#F59E0B` / `#22C55E` |
+| `overlay.scrim` | `rgba(0, 0, 0, 0.6)` |
+
+Typography uses system fonts (no bundled font files): weights regular 400, medium 500, bold
+700; sizes/line heights xs 12/16, sm 14/20, md 16/22, lg 18/24, xl 22/30, xxl 28/36.
+
 ```ts
 import { designSystem } from "@/src/theme"
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: designSystem.colors.background.light,
+    backgroundColor: designSystem.colors.background.base,
     padding: designSystem.spacing.lg,
   },
 })
 ```
 
+Skeleton loading: skeletons use Moti's `Skeleton` (shimmer effect, animation on the UI thread
+through Reanimated), as recorded in ADR-0012. The `Skeleton` atom in
+`src/components/atoms/Skeleton` is the only skeleton API used by screens; it applies the
+`skeleton.base` / `skeleton.highlight` tokens (dark mode colors). All blocks of a screen are
+grouped in one `Skeleton.Group` so they animate in sync, and the skeleton screen mirrors the
+dimensions of the final layout to avoid layout shift.
+
 UI states (present on every data-driven screen, all visible to the user):
 
-- Movies list screen: loading (centered `LoadingIndicator`); error (`ErrorState` with message
-  and a retry action); empty (`EmptyState`; when searching it mentions the searched term; when
-  there is no term and no data it shows a generic empty message); success (the list);
-  pagination loading (footer spinner while fetching the next page); pagination error (footer
-  with a retry action that keeps the already loaded items).
+- Movies list screen: loading (a full-screen skeleton, `MoviesSkeleton`, that mirrors the
+  final layout: category tabs, featured card, section title and grid placeholders, with the
+  real header and bottom menu); error (`ErrorState` with message and a retry action); empty
+  (`EmptyState`; when searching it mentions the searched term; when there is no term and no
+  data it shows a generic empty message); success (featured card + grid); pagination loading
+  (footer spinner, `LoadingIndicator`, while fetching the next page); pagination error (footer
+  with a retry action that keeps the already loaded items). Error and empty states are
+  centered between the category tabs and the bottom menu, which stay visible. When the list
+  has only one movie, only the featured card is shown, with no grid and no empty message.
 - MovieDetail screen: loading; error (`ErrorState` with retry); not found (HTTP 404 → dedicated
   message); success.
 - Missing poster images show a placeholder, and failed image loads fall back to the
@@ -428,12 +528,19 @@ The app is optimized. These rules are mandatory and are verified in plan, tasks 
 
 **Images:**
 
-- Poster sizes are requested by use: list items use TMDB size `w342`; the detail screen uses
-  `w780` (higher resolution as required). Sizes are constants (`TMDB_IMAGE_SIZES` in
+- Image sizes are requested by use: grid cards use the poster at TMDB size `w342`; the
+  featured card uses the backdrop at `w780`; the detail screen uses the poster at `w780`
+  (higher resolution as required). Sizes are constants (`TMDB_IMAGE_SIZES` in
   `src/constants/tmdb.ts`).
 - Every image has explicit width/height (not layout-computed from the image),
   `resizeMode="cover"`, and the placeholder/fallback described in Principle VI. With the
-  React Native `Image` component, `fadeDuration` is set explicitly on Android.
+  React Native `Image` component, `fadeDuration` is set explicitly on Android and
+  `resizeMethod="resize"` is used on Android so images are decoded at the displayed size
+  (lower memory use than the default).
+- Images rendered inside lists belong to memoized item components, so FlashList recycling
+  does not re-render them unnecessarily; image `source` objects are stable between renders.
+- The `Poster` atom is the single place that builds an image with its placeholder, fallback
+  and the rules above, so every screen gets the same optimizations.
 - On item press, before navigating, the app prefetches the `w780` poster (errors ignored) with
   `Image.prefetch` (or the equivalent of the image library in use) so the detail image appears
   quickly.
@@ -456,11 +563,13 @@ APIs behind a stable interface, and ease testing and future swaps.
 
 | File | Wraps | Purpose |
 |---|---|---|
-| `vendors/axios/tmdb-client.ts` | axios | Configured `tmdbClient` instance (base URL, Authorization header from env, language param, error interceptor) |
+| `vendors/axios/tmdb-client.ts` | axios | Configured `tmdbClient` instance (base URL from `env.TMDB_BASE_URL`, Authorization header from env, language param, error interceptor) |
 | `vendors/react-query/client.ts` | `@tanstack/react-query` | Configured `QueryClient` with global error handling, retry logic and cache times |
 | `vendors/react-query/ReactQueryProvider.tsx` | `QueryClientProvider` | Provider component |
 | `vendors/netinfo/index.ts` | `@react-native-community/netinfo` | Connectivity subscription used by `useNetworkStatus` |
 | `vendors/react-navigation/ReactNavigationProvider.tsx` | `@react-navigation/native` | `NavigationContainer` + theme provider |
+| `vendors/moti/index.ts` | `moti`, `react-native-reanimated` | Moti skeleton (`moti/skeleton/react-native-linear-gradient`) used by the `Skeleton` atom |
+| `vendors/linear-gradient/index.ts` | `react-native-linear-gradient` | `LinearGradient` used by the featured card overlay and the skeleton |
 | `vendors/reactotron/index.ts` | `reactotron-react-native` | Dev-only Reactotron instance (imported only inside `__DEV__`) |
 
 No monitoring/analytics/crash-reporting SDK is configured at this time. If one is added, it
@@ -470,12 +579,17 @@ gets its own vendor wrapper (a no-op when its env vars are absent) and an ADR.
 
 **TMDB access**: all calls go through `tmdbClient` (`src/vendors/axios/tmdb-client.ts`) and a
 feature service; components and hooks use the service through hooks. Endpoints used:
-`GET /movie/popular`, `GET /search/movie` (with `include_adult=false`), `GET /movie/{movieId}`.
-The credential is the TMDB API Read Access Token sent as `Authorization: Bearer <token>`, read
-from env (`TMDB_ACCESS_TOKEN`, loaded with `react-native-config` from a git-ignored `.env`
-file). The token is never committed, and a `.env.example` with placeholders is maintained. The
-request language param is the constant `TMDB_LANGUAGE` in `src/constants/tmdb.ts`, equal to
-the app locale (`es-PY`).
+`GET /movie/popular`, `GET /genre/movie/list`, `GET /search/movie` (with
+`include_adult=false`), `GET /movie/{movieId}`.
+The base URL comes from env and already includes the API version
+(`TMDB_BASE_URL=https://api.themoviedb.org/3`), so `tmdbClient` uses `env.TMDB_BASE_URL` as its
+`baseURL` and services call relative paths such as `/movie/popular`. The credential is the TMDB API Read Access Token sent as
+`Authorization: Bearer <token>`, read from env (`TMDB_ACCESS_TOKEN`). Both variables are loaded
+with `react-native-config` from a git-ignored `.env` file and validated with Zod in
+`src/constants/env.ts` (`TMDB_BASE_URL` as a URL). The token is never committed, and a
+`.env.example` with placeholders and the base URL is maintained. The
+request language param is the constant `TMDB_LANGUAGE` in `src/constants/tmdb.ts`
+(`es-PY`), sent on every request, including the genre list.
 
 **DTO → model mapper pattern**: TMDB responses are snake_case DTOs; domain models are camelCase
 and readonly. Mappers are pure functions and services call them before returning data to
@@ -483,21 +597,27 @@ hooks. API responses are typed (DTO interfaces) but not runtime-validated.
 
 ```ts
 // DTO (raw API response)
-interface MovieResponse { id: number; title: string; poster_path: string | null; release_date: string; vote_average: number }
+interface MovieResponse { id: number; title: string; poster_path: string | null; backdrop_path: string | null; release_date: string; genre_ids: number[]; vote_average: number }
 // Model (domain)
-interface Movie { readonly movieId: number; readonly title: string; readonly posterPath: string | null; readonly releaseDate: string; readonly voteAverage: number }
+interface Movie { readonly movieId: number; readonly title: string; readonly posterPath: string | null; readonly backdropPath: string | null; readonly releaseYear: number | null; readonly genreIds: readonly number[]; readonly voteAverage: number | null }
 // Mapper
 export const mapMovie = (dto: MovieResponse): Movie => ({
+  backdropPath: dto.backdrop_path,
+  genreIds: dto.genre_ids,
   movieId: dto.id,
   posterPath: dto.poster_path,
-  releaseDate: dto.release_date,
+  releaseYear: parseReleaseYear(dto.release_date),
   title: dto.title,
-  voteAverage: dto.vote_average,
+  voteAverage: dto.vote_average > 0 ? dto.vote_average : null,
 })
 ```
 
-`MovieDetail` model additionally carries `overview` and `genres` (readonly array of
-`{ genreId, name }`).
+The `/movie/popular` response also carries other fields (overview, popularity, vote_count,
+etc.) that the list does not use. `releaseYear` is `null` when `release_date` is missing or
+empty, and `voteAverage` is `null` when TMDB reports no rating (`0` or missing); in both cases
+the UI shows a dash. The genre list response (`{ genres: [{ id, name }] }`) is mapped to
+`Genre { genreId, name }` by `mapGenre`. The `MovieDetail` model additionally carries
+`overview` and `genres` (readonly array of `Genre`).
 
 `AppError` (`src/utils/app-error.ts`) is the central error class:
 
@@ -618,7 +738,7 @@ Barrel exports: every component folder has an `index.ts` re-exporting the public
 
 **Import order** (eslint-plugin-perfectionist, alphabetical within groups, no blank lines
 between groups): 1) type imports 2) react 3) react-native 4) third-party packages 5) absolute
-`@/` imports in order: types, i18n, navigation, hooks, stores, services, providers, vendors,
+`@/` imports in order: types, navigation, hooks, stores, services, providers, vendors,
 constants, components, assets 6) parent directory (`../`) 7) relative in order: types,
 constants, hooks, services, utils, components, styles.
 
@@ -637,11 +757,11 @@ alphabetical), array includes (`sort-array-includes`). Test files are exempt fro
 - Navigation uses `ROUTES` constants (Principle II).
 - Environment variables are accessed through the `env` object in `src/constants/env.ts`;
   feature code reads configuration from it and not from `react-native-config` directly.
-- Internationalization: i18next + react-i18next, config in `src/i18n/index.ts`; the locale is
-  fixed to `es-PY` (default and fallback; device-locale detection and a language switcher are
-  not part of the current scope); translations in `src/i18n/locales/es-PY.json`; keys extracted
-  with `pnpm i18n` (i18next-parser). Every user-facing string goes through
-  `t("key", "Default value in Spanish")` with the inline default.
+- Language: the app is in Spanish (es-PY) only and has no internationalization library. Every
+  user-facing string lives in a text constants file (`src/constants/strings.ts` for shared
+  texts, `src/features/[feature]/constants/strings.ts` for feature texts), exported as `as
+  const` objects, so components contain no hard-coded literals. The TMDB request language is
+  the constant `TMDB_LANGUAGE = "es-PY"` in `src/constants/tmdb.ts`.
 - Functions and components stay small and single-purpose; code comments explain why, not what.
 
 ### XI. Testing (NON-NEGOTIABLE for Logic)
@@ -661,7 +781,7 @@ File placement: tests are colocated with the source file (`use-popular-movies.ts
 `use-popular-movies.test.ts`), named `[subject].test.ts` or `[subject].test.tsx`.
 
 Coverage scope: collected from `src/**/*.{ts,tsx}` excluding `*.d.ts`, `*.test.*`, `*.mock.*`,
-`*.stories.*`; `**/types.ts`, `**/constants.ts`, `**/styles.ts`; `src/i18n/**`,
+`*.stories.*`; `**/types.ts`, `**/constants.ts`, `**/styles.ts`; `**/strings.ts`,
 `src/constants/**`, `src/assets/**`; `src/vendors/**`; `src/utils/test-utils.tsx`; DTO files.
 
 Test structure:
@@ -692,7 +812,9 @@ Custom render: `src/utils/test-utils.tsx` exports a `render` wrapping `QueryClie
 
 Environment: `TZ=UTC` for all runs; `haste.defaultPlatform: 'ios'` in the Jest config;
 `react-native-config` is mocked in the Jest setup, and the Jest setup includes
-`@shopify/flash-list/jestSetup` so FlashList can render in tests. Tests run against mocked
+`@shopify/flash-list/jestSetup` so FlashList can render in tests, and the Reanimated Jest
+mock so Moti components render (ADR-0012). The Reanimated/worklets Babel plugin is the last
+plugin in `babel.config.js`. Tests run against mocked
 data and never need the real TMDB API.
 
 ### XII. Tooling, Quality Gates and Delivery
@@ -750,6 +872,7 @@ Current ADRs:
 | 0009 | TMDB access via a dedicated Axios client |
 | 0010 | List, search and image performance strategy |
 | 0011 | FlashList for all data lists |
+| 0012 | Moti Skeleton for loading placeholders |
 
 ## Spec Kit Workflow Rules
 

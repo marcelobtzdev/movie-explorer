@@ -9,7 +9,7 @@ The app consumes the public TMDB REST API with no backend of our own. Credential
 
 ## Decision
 
-Wrap Axios in src/vendors/axios/tmdb-client.ts with base URL, Authorization: Bearer header (API Read Access Token from TMDB_ACCESS_TOKEN via react-native-config), the language parameter TMDB_LANGUAGE, and a response interceptor that converts errors to AppError via handleError. Services are the only callers and forward the AbortSignal; DTOs (snake_case) are converted to camelCase readonly models by mappers; responses are typed but not runtime-validated. Image URLs are built only by src/utils/tmdb-image.utils.ts. The token is bundled with the app, which is accepted for a read-only token over public data; it must never be committed (.env.example holds placeholders).
+Wrap Axios in src/vendors/axios/tmdb-client.ts with base URL (TMDB_BASE_URL from the environment, which includes the API version: https://api.themoviedb.org/3), Authorization: Bearer header (API Read Access Token from TMDB_ACCESS_TOKEN via react-native-config), the language parameter TMDB_LANGUAGE, and a response interceptor that converts errors to AppError via handleError. Services are the only callers and forward the AbortSignal; DTOs (snake_case) are converted to camelCase readonly models by mappers; responses are typed but not runtime-validated. Image URLs are built only by src/utils/tmdb-image.utils.ts. The token is bundled with the app, which is accepted for a read-only token over public data; it must never be committed (.env.example holds placeholders).
 
 ## Consequences
 
