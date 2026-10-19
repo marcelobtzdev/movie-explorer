@@ -1,5 +1,5 @@
 import type { Movie } from '@/src/features/movies/models/movie.model';
-import { render, screen } from '@/src/utils/test-utils';
+import { fireEvent, render, screen } from '@/src/utils/test-utils';
 import React from 'react';
 import { FeaturedMovieCard } from './FeaturedMovieCard';
 
@@ -13,10 +13,12 @@ const BASE_MOVIE: Movie = {
   voteAverage: 6.5,
 };
 
+const mockOnPress = jest.fn();
+
 describe('Component: FeaturedMovieCard', () => {
   test('should render the rating, title, genres and year without a badge label', async () => {
     // Act
-    await render(<FeaturedMovieCard genreNames={['Acción', 'Aventura']} movie={BASE_MOVIE} />);
+    await render(<FeaturedMovieCard genreNames={['Acción', 'Aventura']} movie={BASE_MOVIE} onPress={mockOnPress} />);
 
     // Assert
     expect(screen.queryByText('#1 TENDENCIA')).toBeNull();
@@ -29,7 +31,7 @@ describe('Component: FeaturedMovieCard', () => {
 
   test('should show a placeholder when there is no backdrop', async () => {
     // Act
-    await render(<FeaturedMovieCard genreNames={[]} movie={{ ...BASE_MOVIE, backdropPath: null }} />);
+    await render(<FeaturedMovieCard genreNames={[]} movie={{ ...BASE_MOVIE, backdropPath: null }} onPress={mockOnPress} />);
 
     // Assert
     expect(screen.getByText('Sin imagen')).toBeTruthy();
@@ -38,18 +40,23 @@ describe('Component: FeaturedMovieCard', () => {
   test('should show a dash when the rating and year are unknown', async () => {
     // Act
     await render(
-      <FeaturedMovieCard genreNames={[]} movie={{ ...BASE_MOVIE, releaseYear: null, voteAverage: null }} />,
+      <FeaturedMovieCard genreNames={[]} movie={{ ...BASE_MOVIE, releaseYear: null, voteAverage: null }} onPress={mockOnPress} />,
     );
 
     // Assert — one dash for the unknown rating, one for the unknown year
     expect(screen.getAllByText('–')).toHaveLength(2);
   });
 
-  test('should not expose a pressable role', async () => {
-    // Act
-    await render(<FeaturedMovieCard genreNames={[]} movie={BASE_MOVIE} />);
 
-    // Assert — the card is not pressable (FR-023); no button/tab role is exposed for it
-    expect(screen.queryByRole('button')).toBeNull();
+  test('should call onPress with the movie when the card is pressed', async () => {
+    // Arrange
+    mockOnPress.mockClear();
+    await render(<FeaturedMovieCard genreNames={[]} movie={BASE_MOVIE} onPress={mockOnPress} />);
+
+    // Act
+    await fireEvent.press(screen.getByRole('button', { name: new RegExp(BASE_MOVIE.title) }));
+
+    // Assert
+    expect(mockOnPress).toHaveBeenCalledWith(BASE_MOVIE);
   });
 });

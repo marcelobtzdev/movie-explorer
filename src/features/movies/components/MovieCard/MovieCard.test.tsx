@@ -1,5 +1,5 @@
 import type { Movie } from '@/src/features/movies/models/movie.model';
-import { render, screen } from '@/src/utils/test-utils';
+import { fireEvent, render, screen } from '@/src/utils/test-utils';
 import React from 'react';
 import { MovieCard } from './MovieCard';
 
@@ -13,10 +13,12 @@ const BASE_MOVIE: Movie = {
   voteAverage: 6.5,
 };
 
+const mockOnPress = jest.fn();
+
 describe('Component: MovieCard', () => {
   test('should render the title and the footer with year and genres', async () => {
     // Act
-    await render(<MovieCard genreNames={['Acción', 'Aventura']} movie={BASE_MOVIE} />);
+    await render(<MovieCard genreNames={['Acción', 'Aventura']} movie={BASE_MOVIE} onPress={mockOnPress} />);
 
     // Assert
     expect(screen.getByText('Ant-Man and the Wasp: Quantumania')).toBeTruthy();
@@ -26,7 +28,7 @@ describe('Component: MovieCard', () => {
 
   test('should show a placeholder when there is no poster', async () => {
     // Act
-    await render(<MovieCard genreNames={[]} movie={{ ...BASE_MOVIE, posterPath: null }} />);
+    await render(<MovieCard genreNames={[]} movie={{ ...BASE_MOVIE, posterPath: null }} onPress={mockOnPress} />);
 
     // Assert
     expect(screen.getByText('Sin imagen')).toBeTruthy();
@@ -34,7 +36,7 @@ describe('Component: MovieCard', () => {
 
   test('should expose an accessible label with title, year and rating', async () => {
     // Act
-    await render(<MovieCard genreNames={[]} movie={BASE_MOVIE} />);
+    await render(<MovieCard genreNames={[]} movie={BASE_MOVIE} onPress={mockOnPress} />);
 
     // Assert
     expect(screen.getByLabelText('Ant-Man and the Wasp: Quantumania, 2023, valoración 6.5')).toBeTruthy();
@@ -42,7 +44,7 @@ describe('Component: MovieCard', () => {
 
   test('should use the unknown-year and unknown-rating accessibility phrasing when missing', async () => {
     // Act
-    await render(<MovieCard genreNames={[]} movie={{ ...BASE_MOVIE, releaseYear: null, voteAverage: null }} />);
+    await render(<MovieCard genreNames={[]} movie={{ ...BASE_MOVIE, releaseYear: null, voteAverage: null }} onPress={mockOnPress} />);
 
     // Assert
     expect(
@@ -50,11 +52,16 @@ describe('Component: MovieCard', () => {
     ).toBeTruthy();
   });
 
-  test('should not expose a pressable role', async () => {
+
+  test('should call onPress with the movie when the card is pressed', async () => {
+    // Arrange
+    mockOnPress.mockClear();
+    await render(<MovieCard genreNames={[]} movie={BASE_MOVIE} onPress={mockOnPress} />);
+
     // Act
-    await render(<MovieCard genreNames={[]} movie={BASE_MOVIE} />);
+    await fireEvent.press(screen.getByRole('button', { name: new RegExp(BASE_MOVIE.title) }));
 
     // Assert
-    expect(screen.queryByRole('button')).toBeNull();
+    expect(mockOnPress).toHaveBeenCalledWith(BASE_MOVIE);
   });
 });

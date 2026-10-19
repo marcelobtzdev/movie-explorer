@@ -9,10 +9,16 @@ import { Header } from '@/src/components/organisms/Header';
 import { LoadingIndicator } from '@/src/components/molecules/LoadingIndicator';
 import { SearchField } from '@/src/components/molecules/SearchField';
 import { ScreenContainer } from '@/src/components/templates/ScreenContainer';
+import { BOTTOM_MENU_ITEMS } from '@/src/constants/bottom-menu';
 import { LIST_TUNING } from '@/src/constants/list';
+import { TMDB_IMAGE_SIZES } from '@/src/constants/tmdb';
 import { getGenreNames, useMovieGenres } from '@/src/features/genres';
+import { ROUTES } from '@/src/navigation/routes';
+import type { MoviesScreenProps } from '@/src/navigation/navigation.types';
 import { designSystem } from '@/src/theme';
+import { buildTmdbImageUrl, prefetchTmdbImage } from '@/src/utils/tmdb-image.utils';
 import { FlashList } from '@shopify/flash-list';
+import { useNavigation } from '@react-navigation/native';
 import { StyleSheet, View } from 'react-native';
 import React, { useCallback, useMemo } from 'react';
 import { Controller } from 'react-hook-form';
@@ -36,14 +42,8 @@ const CATEGORY_TABS = [
 const SCREEN_GUTTER = designSystem.spacing.lg;
 const GRID_GUTTER = designSystem.spacing.md / 2;
 
-const BOTTOM_MENU_ITEMS = [
-  { active: true, icon: '🔥', label: 'Populares' },
-  { active: false, icon: '🎞️', label: 'Cartelera' },
-  { active: false, icon: '⭐', label: 'Mejor Valoradas' },
-  { active: false, icon: '🔖', label: 'Favoritos' },
-] as const;
-
 export function MoviesScreen() {
+  const navigation = useNavigation<MoviesScreenProps['navigation']>();
   const genresQuery = useMovieGenres();
   const searchTerm = useMoviesStore((state) => state.searchTerm);
   const { clear, control } = useMovieSearch();
@@ -88,13 +88,22 @@ export function MoviesScreen() {
     }
   }, [isSearching, popularQuery]);
 
+  // Prefetches the detail image so it is already cached when the detail screen mounts.
+  const handleMoviePress = useCallback(
+    (movie: Movie) => {
+      prefetchTmdbImage(buildTmdbImageUrl(movie.backdropPath, TMDB_IMAGE_SIZES.detailBackdrop));
+      navigation.navigate(ROUTES.MOVIE_DETAIL, { movieId: movie.movieId });
+    },
+    [navigation],
+  );
+
   const renderItem = useCallback(
     ({ item }: { readonly item: Movie }) => (
       <View style={styles.gridItem}>
-        <MovieCard genreNames={getGenreNames(item.genreIds, genreLookup, 2)} movie={item} />
+        <MovieCard genreNames={getGenreNames(item.genreIds, genreLookup, 2)} movie={item} onPress={handleMoviePress} />
       </View>
     ),
-    [genreLookup],
+    [genreLookup, handleMoviePress],
   );
 
   const keyExtractor = useCallback((item: Movie) => String(item.movieId), []);
@@ -118,7 +127,11 @@ export function MoviesScreen() {
         </View>
         {featured ? (
           <View style={styles.featuredWrapper}>
-            <FeaturedMovieCard genreNames={getGenreNames(featured.genreIds, genreLookup, 3)} movie={featured} />
+            <FeaturedMovieCard
+              genreNames={getGenreNames(featured.genreIds, genreLookup, 3)}
+              movie={featured}
+              onPress={handleMoviePress}
+            />
           </View>
         ) : null}
         <Text size="lg" weight="bold">
@@ -126,7 +139,7 @@ export function MoviesScreen() {
         </Text>
       </View>
     ),
-    [featured, genreLookup, sectionTitle],
+    [featured, genreLookup, handleMoviePress, sectionTitle],
   );
 
   const listFooter = useMemo(() => {

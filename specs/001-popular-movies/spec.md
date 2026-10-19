@@ -110,7 +110,7 @@ At every point the user can tell the state of the screen: loading the first time
 - **FR-020**: All user-facing text MUST be in Spanish (es-PY); movie titles are shown in the language the service provides.
 - **FR-021**: The screen MUST respect safe areas and scale its text according to the system font size.
 - **FR-022**: Every interactive element (retry actions) MUST expose an accessible label and a touch target of at least 44x44 pt. Movie cards MUST expose a label with title, year and rating.
-- **FR-023**: Tapping a movie card or the featured card MUST NOT navigate or trigger any action in this feature (the detail screen is specified separately).
+- **FR-023**: Tapping a movie card or the featured card MUST NOT navigate or trigger any action in this feature. *Superseded by `specs/003-movie-detail/spec.md` FR-001, which opens the detail screen.*
 
 ### Key Entities
 

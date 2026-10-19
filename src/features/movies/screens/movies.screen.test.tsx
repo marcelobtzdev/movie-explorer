@@ -6,6 +6,12 @@ import { usePopularMovies } from '../hooks/use-popular-movies';
 import { useSearchMovies } from '../hooks/use-search-movies';
 import { MoviesScreen } from './movies.screen';
 
+const mockNavigate = jest.fn();
+
+jest.mock('@react-navigation/native', () => ({
+  useNavigation: () => ({ navigate: mockNavigate }),
+}));
+
 jest.mock('@/src/features/genres', () => ({
   getGenreNames: jest.requireActual('@/src/features/genres/utils/get-genre-names.utils').getGenreNames,
   useMovieGenres: jest.fn(),
@@ -415,5 +421,36 @@ describe('Screen: MoviesScreen', () => {
       expect(lastSearchTerm()).toBe('');
       expect(screen.getByText('Películas Populares')).toBeTruthy();
     });
+  });
+});
+
+describe('Screen: MoviesScreen navigation to the detail', () => {
+  beforeEach(() => {
+    mockUseMovieGenres.mockReturnValue(GENRES_SUCCESS);
+    mockNavigate.mockClear();
+  });
+
+  test('should open the detail of the tapped grid card with its movie id', async () => {
+    // Arrange
+    mockUsePopularMovies.mockReturnValue(moviesResult({ data: [MOVIE(1), MOVIE(2)] }));
+    await render(<MoviesScreen />);
+
+    // Act
+    await fireEvent.press(screen.getByRole('button', { name: /Movie 2/ }));
+
+    // Assert
+    expect(mockNavigate).toHaveBeenCalledWith('MovieDetail', { movieId: 2 });
+  });
+
+  test('should open the detail of the featured card with its movie id', async () => {
+    // Arrange
+    mockUsePopularMovies.mockReturnValue(moviesResult({ data: [MOVIE(1), MOVIE(2)] }));
+    await render(<MoviesScreen />);
+
+    // Act
+    await fireEvent.press(screen.getByRole('button', { name: 'Movie 1' }));
+
+    // Assert
+    expect(mockNavigate).toHaveBeenCalledWith('MovieDetail', { movieId: 1 });
   });
 });

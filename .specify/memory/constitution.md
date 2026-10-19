@@ -1,8 +1,10 @@
 <!--
 Sync Impact Report
 ==================
-Version change: 1.2.1 → 1.3.0
+Version change: 1.3.0 → 1.4.0
 Added:
+  - Movie detail (003-movie-detail) — tapping a movie opens the detail screen; detail image is
+    the backdrop at `w1280` with prefetch on tap; principles II, VII and the feature list amended.
   - Search (002-movie-search) — search field on the movies screen, `GET /search/movie` with
     only `query` and `language`, single-page results; principles II and IX amended to match.
 Modified principles:
@@ -55,9 +57,9 @@ The current functional scope is the following:
    title and a footer with the release year (from `release_date`) and the genre names, in the
    form "2023 • Acción / Aventura". Genre names come from `GET /genre/movie/list`, which is
    requested before the list and resolved by genre id (see Principle III).
-2. **Movie detail**: tapping an item opens a detail screen with a higher-resolution poster
-   image, title, synopsis (`overview`), genres and release date. Data comes from
-   `GET /movie/{movieId}`.
+2. **Movie detail**: tapping a grid card, the featured card or a search result opens a detail
+   screen with a higher-resolution backdrop image, title, release date (in Spanish long form),
+   genre names and synopsis (`overview`). Data comes from `GET /movie/{movieId}`.
 3. **Search**: a search field on the list screen, between the header and the category tabs,
    searches movies by title with `GET /search/movie` (sending only `query` and `language`). The
    typed text is debounced; the results use the same layout as the popular list. An empty search
@@ -560,7 +562,7 @@ The app is optimized. These rules are mandatory and are verified in plan, tasks 
 **Images:**
 
 - Image sizes are requested by use: grid cards use the poster at TMDB size `w342`; the
-  featured card uses the backdrop at `w780`; the detail screen uses the poster at `w780`
+  featured card uses the backdrop at `w780`; the detail screen uses the backdrop at `w1280`
   (higher resolution as required). Sizes are constants (`TMDB_IMAGE_SIZES` in
   `src/constants/tmdb.ts`).
 - Every image has explicit width/height (not layout-computed from the image),
@@ -572,7 +574,7 @@ The app is optimized. These rules are mandatory and are verified in plan, tasks 
   does not re-render them unnecessarily; image `source` objects are stable between renders.
 - The `Poster` atom is the single place that builds an image with its placeholder, fallback
   and the rules above, so every screen gets the same optimizations.
-- On item press, before navigating, the app prefetches the `w780` poster (errors ignored) with
+- On item press, before navigating, the app prefetches the `w1280` backdrop (errors ignored) with
   `Image.prefetch` (or the equivalent of the image library in use) so the detail image appears
   quickly.
 - Image URLs are built by `src/utils/tmdb-image.utils.ts`.
@@ -938,4 +940,4 @@ redefining a principle, MINOR for adding a principle or materially expanding gui
 (Constitution Check), by `/speckit-analyze` (a constitution conflict is CRITICAL), and in code
 review. Violations require explicit justification in the plan's Complexity Tracking table.
 
-**Version**: 1.3.0 | **Ratified**: 2026-10-17 | **Last Amended**: 2026-10-19
+**Version**: 1.4.0 | **Ratified**: 2026-10-17 | **Last Amended**: 2026-10-19

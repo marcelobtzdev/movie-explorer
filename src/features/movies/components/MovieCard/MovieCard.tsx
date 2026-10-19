@@ -7,7 +7,7 @@ import { MOVIES_STRINGS } from '@/src/features/movies/constants/strings';
 import { formatCardFooter } from '@/src/features/movies/utils/format-card-footer.utils';
 import { formatRating } from '@/src/features/movies/utils/format-rating.utils';
 import { designSystem } from '@/src/theme';
-import { StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 import React from 'react';
 
 const MAX_GRID_GENRES = 2;
@@ -15,17 +15,20 @@ const MAX_GRID_GENRES = 2;
 export interface MovieCardProps {
   readonly genreNames: readonly string[];
   readonly movie: Movie;
+  readonly onPress: (movie: Movie) => void;
 }
 
-function MovieCardComponent({ genreNames, movie }: MovieCardProps) {
+function MovieCardComponent({ genreNames, movie, onPress }: MovieCardProps) {
   const footer = formatCardFooter(movie.releaseYear, genreNames.slice(0, MAX_GRID_GENRES));
   const ratingLabel = formatRating(movie.voteAverage);
   const yearLabel = movie.releaseYear === null ? 'año desconocido' : String(movie.releaseYear);
   const ratingAccessibilityLabel = movie.voteAverage === null ? 'sin valoración' : `valoración ${ratingLabel}`;
 
   return (
-    <View
+    <Pressable
       accessibilityLabel={`${movie.title}, ${yearLabel}, ${ratingAccessibilityLabel}`}
+      accessibilityRole="button"
+      onPress={() => onPress(movie)}
       style={styles.card}
     >
       <View style={styles.posterWrapper}>
@@ -52,7 +55,7 @@ function MovieCardComponent({ genreNames, movie }: MovieCardProps) {
           {footer}
         </Text>
       </View>
-    </View>
+    </Pressable>
   );
 }
 

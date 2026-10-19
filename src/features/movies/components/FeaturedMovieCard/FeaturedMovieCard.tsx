@@ -8,7 +8,7 @@ import { MOVIES_STRINGS } from '@/src/features/movies/constants/strings';
 import { formatRating } from '@/src/features/movies/utils/format-rating.utils';
 import { designSystem } from '@/src/theme';
 import { LinearGradient } from '@/src/vendors/linear-gradient';
-import { StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 import React from 'react';
 
 const MAX_FEATURED_GENRES = 3;
@@ -16,13 +16,14 @@ const MAX_FEATURED_GENRES = 3;
 export interface FeaturedMovieCardProps {
   readonly genreNames: readonly string[];
   readonly movie: Movie;
+  readonly onPress: (movie: Movie) => void;
 }
 
-export function FeaturedMovieCard({ genreNames, movie }: FeaturedMovieCardProps) {
+export function FeaturedMovieCard({ genreNames, movie, onPress }: FeaturedMovieCardProps) {
   const year = movie.releaseYear === null ? '–' : String(movie.releaseYear);
 
   return (
-    <View style={styles.card}>
+    <Pressable accessibilityLabel={movie.title} accessibilityRole="button" onPress={() => onPress(movie)} style={styles.card}>
       <Poster
         height="100%"
         path={movie.backdropPath}
@@ -52,7 +53,7 @@ export function FeaturedMovieCard({ genreNames, movie }: FeaturedMovieCardProps)
           </Text>
         </View>
       </View>
-    </View>
+    </Pressable>
   );
 }
 
