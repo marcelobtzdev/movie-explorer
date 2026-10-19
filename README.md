@@ -4,7 +4,67 @@ Mobile app (React Native CLI + TypeScript) that consumes the [TMDB API](https://
 
 Architecture decisions are documented in [`docs/adr/`](./docs/adr). Project rules live in [`.specify/memory/constitution.md`](./.specify/memory/constitution.md).
 
-> Current state: the popular movies screen (header, category tabs, featured card, infinite grid, skeleton and error/empty states) is the first feature. Search and movie detail are planned as the next specs.
+Implemented features: popular movies with infinite scroll, search by title, and movie detail. See [Features](#features) for what each one does and why each library was chosen.
+
+## Features
+
+### 1. Popular movies list
+
+- The main screen shows TMDB's most popular movies in a **two-column grid** with a **featured card** for the first movie (wide backdrop, rating, genre names and release year). The rest of the movies go into the grid, and the first movie never appears twice.
+- The genre catalog is loaded **before** the list (`GET /genre/movie/list`) so each card can show genre names instead of ids. The lookup is built once per response and passed down as props.
+- **Why FlashList:** `@shopify/flash-list` recycles cells instead of keeping one view per item, so a long grid stays smooth on low-end devices. `drawDistance` (250) renders only the items close to the viewport, `numColumns` produces the grid, and the list header (tabs, featured card, section title) scrolls with the content.
+- **Why memoized cards:** `MovieCard` is wrapped in `React.memo` and receives stable callbacks, so recycled cells do not re-render unless their movie changes.
+
+### 2. Infinite scroll (pagination)
+
+- Next pages load when the user is within half a screen of the end (`onEndReachedThreshold` 0.5), with no button.
+- A new page is requested only when no page is loading, and never after an error (the footer shows a retry action instead). A repeated scroll to the end does not trigger a second request.
+- TMDB caps pagination at 500 pages, so `getNextPageParam` stops at `min(total_pages, 500)`.
+- Movies that appear on more than one page (TMDB pages can overlap) are de-duplicated by id in the query's `select`, not during render.
+- **Why `useInfiniteQuery`:** TanStack Query keeps every loaded page in the cache, so returning to the list does not reload the pages already seen.
+
+### 3. Search by title
+
+- A search field sits above the category tabs. The typed text is **debounced 300 ms**; only then the trimmed term is committed, so a request is sent per pause and not per keystroke.
+- Clearing the field (deleting the text or the clear action) returns to the popular list immediately, and the popular data comes from the cache.
+- Results use the same layout as the popular list. Results of a previous term stay visible while the new term loads (`keepPreviousData`), so the screen does not flash empty.
+- Search shows the **first page** of results only (TMDB returns up to 20 movies per page). Showing more would need the `page` parameter and infinite scrolling; see the spec for the decision.
+- **Why React Hook Form + Zod:** the field is the app's only form. React Hook Form keeps its state outside React's render cycle, and Zod validates the trimmed value (maximum 100 characters) through `zodResolver`.
+- **Why Zustand for one string:** the committed term is shared by the search hook and the screen, and it is read outside React when needed. Server results are never copied into Zustand; they stay in TanStack Query under the key `moviesKeys.search(term)`.
+
+### 4. Movie detail
+
+- Tapping a grid card, the featured card or a search result opens the detail screen (native stack navigation, typed params: `{ movieId }` only).
+- The detail loads `GET /movie/{movieId}` and shows the backdrop image, title, release date in Spanish long form ("1 de marzo de 2024"), genre chips and the synopsis.
+- **Prefetch on tap:** before navigating, the app prefetches the detail image with `Image.prefetch`, so the picture is usually ready when the screen opens. A failed prefetch is ignored.
+- **Caching:** the detail query has a 10-minute `staleTime`, so opening the same movie again does not wait for the network.
+- States: a skeleton with the final layout while loading; an error with "Reintentar" that repeats only the detail request; a "not found" message for a `404`, without a retry button.
+
+### 5. Loading, error, empty and offline states
+
+- **Skeleton** (`Skeleton` atom): a shimmer placeholder with the same layout as the content, so the page does not jump when data arrives. Blocks inside one `Skeleton.Group` animate in sync. The shimmer is a `react-native-reanimated` animation running on the UI thread through `react-native-worklets`, so it does not compete with JavaScript work.
+- **Inline states:** the list and the detail render their own error, empty and not-found states with retry or back actions. The header, tabs and bottom menu stay visible.
+- **Global overlays:** network and server failures in other requests show a full-screen overlay with a retry action, driven by Zustand stores. Screens that handle their own errors opt out with `meta: { skipNetworkError, skipServerError }`, so the same error is not shown twice.
+- **Offline:** `@react-native-community/netinfo` detects connection changes. Content already on screen stays visible; when the connection returns, the app shows a toast and refetches the queries.
+
+### 6. Images
+
+- TMDB serves each image in several sizes, and the app requests the size each place needs: grid posters `w342`, featured backdrop `w780`, detail backdrop `w1280`. Smaller sizes mean less data and less memory.
+- The `Poster` atom is the only component that renders images. It sets explicit dimensions, uses `resizeMode="cover"`, shows a placeholder when there is no path, and falls back to the same placeholder when the image fails to load.
+- On Android the image uses `resizeMethod="resize"`, so it is decoded at the displayed size instead of its full resolution.
+- Image URLs are built by `buildTmdbImageUrl` from the constant `https://image.tmdb.org/t/p/` and the size constants in `src/constants/tmdb.ts`. The app does not call TMDB's `/configuration` endpoint.
+
+### 7. Accessibility and layout
+
+- Every interactive element has an `accessibilityRole` and label; touch targets are at least 44x44 pt (small visual elements use a `hitSlop` to reach that size).
+- The screen respects the safe areas (the bottom menu owns the bottom inset) and supports system font scaling.
+- The search field keeps the keyboard open for taps on results and dismisses it when the user scrolls the results.
+
+### 8. Configuration and quality
+
+- **Environment:** `.env` is read by `react-native-config` and validated with Zod at startup, so a missing or malformed `TMDB_BASE_URL` or `TMDB_ACCESS_TOKEN` fails with a clear message instead of a request error later.
+- **Production build:** `babel-plugin-transform-remove-console` removes `console.*` calls. Reactotron is loaded only in development.
+- **Tests:** each feature has colocated unit, hook, component and screen tests with Jest and React Native Testing Library. `pnpm pr:check` runs lint, types and tests.
 
 ## Tech stack
 
@@ -26,10 +86,11 @@ Versions are the ones pinned in `package.json`.
 | --- | --- | --- |
 | Navigation | `@react-navigation/native` + `@react-navigation/native-stack` 7, `react-native-screens`, `react-native-safe-area-context` | Single native stack; route names in `src/navigation/routes.ts` |
 | Server state | `@tanstack/react-query` 5 | Keys → service → hook pattern; `useInfiniteQuery` for the popular movies pagination |
-| Global client state | `zustand` 5 | Two small stores: network/server error overlays and toast notifications (no persistence). Chosen over Redux to avoid boilerplate in a small app (ADR-0004) |
+| Global client state | `zustand` 5 | Small in-memory stores: network/server error overlays, toast notifications, and the committed search term. No persistence. Chosen over Redux to avoid boilerplate in a small app (ADR-0004) |
 | HTTP | `axios` | Single `tmdbClient` (base URL and Bearer token from env, `language=es-PY` on every request, errors normalized to `AppError`) |
-| Validation | `zod` 4 | Validates environment variables at startup (and forms when search arrives) |
-| Lists | `@shopify/flash-list` 2 | 2-column grid with cell recycling (ADR-0011) |
+| Forms | `react-hook-form` 7 + `@hookform/resolvers` 5 | The search field, validated with a Zod schema through `zodResolver` |
+| Validation | `zod` 4 | Validates environment variables at startup and the search form |
+| Lists | `@shopify/flash-list` 2 | 2-column grid with cell recycling (ADR-0011), see [Features](#1-popular-movies-list) |
 | Skeleton | `react-native-reanimated` 4 (with `react-native-worklets`) + `react-native-linear-gradient` | Project-owned shimmer `Skeleton` atom (ADR-0013, supersedes the Moti choice of ADR-0012) |
 | Connectivity | `@react-native-community/netinfo` | Detects offline state; reconnection refetches queries |
 | Environment | `react-native-config` | Reads `.env` (`TMDB_BASE_URL`, `TMDB_ACCESS_TOKEN`) |
@@ -39,13 +100,13 @@ Versions are the ones pinned in `package.json`.
 
 ### Data and caching
 
-- **API:** TMDB v3 (`GET /movie/popular`, `GET /genre/movie/list`), language `es-PY`.
+- **API:** TMDB v3 (`GET /movie/popular`, `GET /genre/movie/list`, `GET /search/movie`, `GET /movie/{movieId}`), language `es-PY` on every request.
 - **Genres first:** the genre catalog is fetched once before the movie list (it gates the list query) and resolved by id to names.
-- **Query cache:** lists `staleTime` 5 min, `gcTime` 30 min; genres `staleTime` and `gcTime` 24 h; automatic retries disabled (each manual "Reintentar" press makes exactly one request).
+- **Query cache:** popular list and search `staleTime` 5 min; movie detail `staleTime` 10 min; `gcTime` 30 min; genres `staleTime` and `gcTime` 24 h; automatic retries disabled (each manual "Reintentar" press makes exactly one request).
 - **Request cancellation:** services receive the TanStack Query `AbortSignal` and pass it to Axios.
 - **Pagination:** infinite scroll (threshold 0.5, no duplicate concurrent loads), capped at `min(total_pages, 500)` (TMDB limit), de-duplicated by movie id.
 - **Global error handling:** the `QueryClient` routes network and server errors to the Zustand overlay stores; screens opt out per query with `meta: { skipNetworkError, skipServerError, skipNotify }` when they show their own inline error state.
-- **Images:** TMDB sizes by use (`w342` grid posters, `w780` featured backdrop), explicit dimensions, placeholder and fallback, Android `resizeMethod="resize"`.
+- **Images:** TMDB sizes by use (`w342` grid posters, `w780` featured backdrop, `w1280` detail backdrop), explicit dimensions, placeholder and fallback, Android `resizeMethod="resize"`. Details in [Features](#6-images).
 
 ### Quality tooling
 
@@ -63,7 +124,7 @@ Versions are the ones pinned in `package.json`.
 
 ```
 src/
-├── features/      # Feature slices (movies, genres), each with its own api, hooks, components, screens
+├── features/      # Feature slices (movies, genres, movie-detail), each with its own api, hooks, components, screens
 ├── components/    # Shared UI (Atomic Design: atoms, molecules, organisms, templates)
 ├── stores/        # Global Zustand stores
 ├── vendors/       # Third-party wrappers (axios, react-query, react-navigation, netinfo, linear-gradient, reactotron)
