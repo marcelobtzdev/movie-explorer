@@ -1,7 +1,10 @@
 <!--
 Sync Impact Report
 ==================
-Version change: 1.3.0 → 1.4.0
+Version change: 1.4.0 → 1.5.0
+Changed:
+  - Error overlays are global by default (Principle IX): network and server errors show the overlays
+    from the QueryClient; a query whose screen renders its own error state sets the skip flags.
 Added:
   - Movie detail (003-movie-detail) — tapping a movie opens the detail screen; detail image is
     the backdrop at `w1280` with prefetch on tap; principles II, VII and the feature list amended.
@@ -324,9 +327,12 @@ The `QueryClient` is configured in `src/vendors/react-query/client.ts`, with:
   produces exactly 1 network call.
 - Default cache times: `staleTime` 5 minutes for lists and search; `staleTime` 10 minutes for
   movie detail; `gcTime` 30 minutes. Values live in `src/constants/query.ts`.
-- `meta.skipNotify: true` on a query suppresses toast notifications; `meta.skipServerError: true`
-  suppresses the server-error overlay; `meta.skipNetworkError: true` suppresses the
-  network-error overlay.
+- Overlays are global by default: every query or mutation error that is a network error (no HTTP
+  status) or a server error (500) shows its overlay through the `QueryCache` / `MutationCache`
+  handlers. A query whose screen renders its own error state (inline error, retry or footer retry)
+  MUST set `meta: { skipNetworkError: true, skipServerError: true }` so the error is not shown
+  twice. `meta.skipNotify` suppresses toasts. Every data query of this app that has inline error
+  states sets both skip flags.
 
 ### IV. Client State with Zustand v5
 
@@ -702,7 +708,7 @@ ECONNABORTED, connection refused; cancellations excluded):
   `networkStore.isVisible` → `hide()`; `queryClient.invalidateQueries()` (refetches only queries
   with active observers; unmounted ones refetch lazily on remount); Toast
   "Conexión restablecida, actualizando datos...".
-- Suppress with `meta: { skipNetworkError: true }`.
+- Suppress with `meta: { skipNetworkError: true }` when the screen renders its own error state.
 
 **SERVER ERROR FLOW** (`statusCode === 500`: the server responded but failed internally):
 
@@ -720,7 +726,7 @@ ECONNABORTED, connection refused; cancellations excluded):
   (vs yellow warning); title "Ocurrió un problema en el servidor" (vs "Hubo un problema de
   conexión"); no auto-close on reconnect (`useNetworkStatus` does not close the server
   overlay); `onSuccess` closes only when `isRetrying = true`.
-- Suppress with `meta: { skipServerError: true }`.
+- Suppress with `meta: { skipServerError: true }` when the screen renders its own error state.
 
 Other HTTP errors (401 invalid token, 404 not found, 429 rate limit) are handled by the owning
 screen with its own error state (404 on detail → "not found" state; others → generic
@@ -940,4 +946,4 @@ redefining a principle, MINOR for adding a principle or materially expanding gui
 (Constitution Check), by `/speckit-analyze` (a constitution conflict is CRITICAL), and in code
 review. Violations require explicit justification in the plan's Complexity Tracking table.
 
-**Version**: 1.4.0 | **Ratified**: 2026-10-17 | **Last Amended**: 2026-10-19
+**Version**: 1.5.0 | **Ratified**: 2026-10-17 | **Last Amended**: 2026-10-19
