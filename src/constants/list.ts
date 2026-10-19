@@ -4,3 +4,5 @@ export const LIST_TUNING = {
 } as const;
 
 export const MAX_TMDB_PAGE = 500;
+
+export const SEARCH_DEBOUNCE_MS = 300;

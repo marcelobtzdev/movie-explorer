@@ -36,6 +36,17 @@ describe('Mapper: mapMovie', () => {
     expect(result.releaseYear).toBeNull();
   });
 
+  test('should map a missing poster_path key to posterPath null', () => {
+    // Arrange — TMDB sometimes returns `posterh` instead of `poster_path`
+    const dtoWithoutPoster = { ...BASE_DTO, poster_path: undefined } as unknown as MovieResponseDto;
+
+    // Act
+    const result = mapMovie(dtoWithoutPoster);
+
+    // Assert
+    expect(result.posterPath).toBeNull();
+  });
+
   test('should map vote_average 0 to voteAverage null', () => {
     // Act
     const result = mapMovie({ ...BASE_DTO, vote_average: 0 });

@@ -1,7 +1,10 @@
 <!--
 Sync Impact Report
 ==================
-Version change: 1.2.0 → 1.2.1
+Version change: 1.2.1 → 1.3.0
+Added:
+  - Search (002-movie-search) — search field on the movies screen, `GET /search/movie` with
+    only `query` and `language`, single-page results; principles II and IX amended to match.
 Modified principles:
   - Project Context and Scope — corrected where the pnpm node-linker setting must live: this
     project also has a `pnpm-workspace.yaml` (holding `minimumReleaseAgeExclude`), and once that
@@ -55,8 +58,10 @@ The current functional scope is the following:
 2. **Movie detail**: tapping an item opens a detail screen with a higher-resolution poster
    image, title, synopsis (`overview`), genres and release date. Data comes from
    `GET /movie/{movieId}`.
-3. **Search**: a search bar on the list screen searches movies by title with
-   `GET /search/movie`. An empty search shows the popular list again.
+3. **Search**: a search field on the list screen, between the header and the category tabs,
+   searches movies by title with `GET /search/movie` (sending only `query` and `language`). The
+   typed text is debounced; the results use the same layout as the popular list. An empty search
+   shows the popular list again. Search shows the first page of results only (see Principle IX).
 4. **UI states**: loading, error and empty list are visible to the user on every data-driven
    screen. While the first batch loads, the movies screen shows a full-screen skeleton.
 5. **Main screen layout**: the movies screen has a header with the visible app name
@@ -80,7 +85,7 @@ dark theme), a language switcher, push notifications, analytics, crash reporting
 tablet-specific layouts, and animations beyond functional feedback.
 
 Also not in the current scope, because they arrive with later specs or are not needed:
-the search bar and filters (they arrive with the search spec), a grid/list view toggle,
+filters beyond the search field, a grid/list view toggle,
 featured-card actions (detail button, save, share), bookmark icons, movie runtime, and any
 extra content in the footer of grid cards (labels such as "IMAX" or "OSCAR WINNER", arrows or
 call-to-action icons): the card footer contains only the release year and the genre names.
@@ -171,7 +176,7 @@ Feature inventory (each feature is introduced by its own Spec Kit spec):
 
 | Feature | Responsibility |
 |---|---|
-| movies | Popular movies list, search bar, list UI states, pagination |
+| movies | Popular movies list, search (002), list UI states, pagination |
 | movie-detail | Detail screen of a single movie |
 
 Internal structure of a feature (a layer is created only when there is something to put in
@@ -604,8 +609,8 @@ gets its own vendor wrapper (a no-op when its env vars are absent) and an ADR.
 
 **TMDB access**: all calls go through `tmdbClient` (`src/vendors/axios/tmdb-client.ts`) and a
 feature service; components and hooks use the service through hooks. Endpoints used:
-`GET /movie/popular`, `GET /genre/movie/list`, `GET /search/movie` (with
-`include_adult=false`), `GET /movie/{movieId}`.
+`GET /movie/popular`, `GET /genre/movie/list`, `GET /search/movie` (sending only `query` and
+`language`; `include_adult` keeps TMDB's default `false`), `GET /movie/{movieId}`.
 The base URL comes from env and already includes the API version
 (`TMDB_BASE_URL=https://api.themoviedb.org/3`), so `tmdbClient` uses `env.TMDB_BASE_URL` as its
 `baseURL` and services call relative paths such as `/movie/popular`. The credential is the TMDB API Read Access Token sent as
@@ -933,4 +938,4 @@ redefining a principle, MINOR for adding a principle or materially expanding gui
 (Constitution Check), by `/speckit-analyze` (a constitution conflict is CRITICAL), and in code
 review. Violations require explicit justification in the plan's Complexity Tracking table.
 
-**Version**: 1.2.1 | **Ratified**: 2026-10-17 | **Last Amended**: 2026-10-18
+**Version**: 1.3.0 | **Ratified**: 2026-10-17 | **Last Amended**: 2026-10-19

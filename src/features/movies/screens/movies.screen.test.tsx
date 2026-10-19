@@ -1,8 +1,9 @@
 import type { Genre } from '@/src/features/genres';
 import { useMovieGenres } from '@/src/features/genres';
-import { fireEvent, render, screen } from '@/src/utils/test-utils';
 import React from 'react';
+import { act, fireEvent, render, screen } from '@/src/utils/test-utils';
 import { usePopularMovies } from '../hooks/use-popular-movies';
+import { useSearchMovies } from '../hooks/use-search-movies';
 import { MoviesScreen } from './movies.screen';
 
 jest.mock('@/src/features/genres', () => ({
@@ -14,8 +15,13 @@ jest.mock('../hooks/use-popular-movies', () => ({
   usePopularMovies: jest.fn(),
 }));
 
+jest.mock('../hooks/use-search-movies', () => ({
+  useSearchMovies: jest.fn(),
+}));
+
 const mockUseMovieGenres = useMovieGenres as jest.Mock;
 const mockUsePopularMovies = usePopularMovies as jest.Mock;
+const mockUseSearchMovies = useSearchMovies as jest.Mock;
 
 // MOCK DATA
 const GENRES: readonly Genre[] = [
@@ -236,6 +242,178 @@ describe('Screen: MoviesScreen', () => {
       // Assert
       expect(screen.queryByText('No se pudieron cargar más películas')).toBeNull();
       expect(screen.queryByLabelText('Películas Populares')).toBeNull();
+    });
+  });
+
+  describe('Search', () => {
+    const SEARCH_INPUT = 'Buscar películas';
+
+    const searchResult = (overrides: Partial<{ data: unknown; isError: boolean; isLoading: boolean; refetch: jest.Mock }>) => ({
+      data: undefined,
+      isError: false,
+      isLoading: false,
+      refetch: jest.fn().mockResolvedValue({ isSuccess: true }),
+      ...overrides,
+    });
+
+    const lastSearchTerm = () => mockUseSearchMovies.mock.calls.at(-1)?.[0].term;
+
+    const typeAndCommit = async (text: string) => {
+      await fireEvent.changeText(screen.getByLabelText(SEARCH_INPUT), text);
+      await act(async () => {
+        jest.advanceTimersByTime(300);
+      });
+    };
+
+    beforeEach(() => {
+      jest.useFakeTimers();
+      mockUseMovieGenres.mockReturnValue(GENRES_SUCCESS);
+      mockUsePopularMovies.mockReturnValue(moviesResult({ data: [MOVIE(1), MOVIE(2)] }));
+      mockUseSearchMovies.mockReturnValue(searchResult({ data: [] }));
+    });
+
+    afterEach(() => {
+      jest.useRealTimers();
+    });
+
+    test('should render the search field above the category tabs', async () => {
+      // Act
+      await render(<MoviesScreen />);
+
+      // Assert
+      expect(screen.getByLabelText(SEARCH_INPUT)).toBeTruthy();
+      expect(screen.getByPlaceholderText('Buscar películas')).toBeTruthy();
+    });
+
+    test('should not send a search request while the field is empty', async () => {
+      // Act
+      await render(<MoviesScreen />);
+
+      // Assert
+      expect(lastSearchTerm()).toBe('');
+      expect(screen.getByText('Películas Populares')).toBeTruthy();
+    });
+
+    test('should commit the typed term only after the 300 ms pause', async () => {
+      // Arrange
+      await render(<MoviesScreen />);
+
+      // Act
+      await fireEvent.changeText(screen.getByLabelText(SEARCH_INPUT), 'fight club');
+      await act(async () => {
+        jest.advanceTimersByTime(299);
+      });
+
+      // Assert
+      expect(lastSearchTerm()).toBe('');
+
+      // Act
+      await act(async () => {
+        jest.advanceTimersByTime(1);
+      });
+
+      // Assert
+      expect(lastSearchTerm()).toBe('fight club');
+    });
+
+    test('should trim the term and treat whitespace-only text as an empty search', async () => {
+      // Arrange
+      await render(<MoviesScreen />);
+
+      // Act
+      await typeAndCommit('   ');
+
+      // Assert
+      expect(lastSearchTerm()).toBe('');
+      expect(screen.getByText('Películas Populares')).toBeTruthy();
+    });
+
+    test('should show the search results with the first result as featured and a title naming the term', async () => {
+      // Arrange
+      mockUseSearchMovies.mockReturnValue(searchResult({ data: [MOVIE(1), MOVIE(2), MOVIE(3)] }));
+      await render(<MoviesScreen />);
+
+      // Act
+      await typeAndCommit('fight club');
+
+      // Assert
+      expect(screen.getByText('Resultados para «fight club»')).toBeTruthy();
+      expect(screen.getAllByText('Movie 1')).toHaveLength(1);
+      expect(screen.getByText('Movie 3')).toBeTruthy();
+      expect(screen.queryByText('Películas Populares')).toBeNull();
+    });
+
+    test('should show the empty message naming the searched term', async () => {
+      // Arrange
+      mockUseSearchMovies.mockReturnValue(searchResult({ data: [] }));
+      await render(<MoviesScreen />);
+
+      // Act
+      await typeAndCommit('zzzz');
+
+      // Assert
+      expect(screen.getByText('No encontramos películas para «zzzz»')).toBeTruthy();
+      expect(screen.getByLabelText(SEARCH_INPUT)).toBeTruthy();
+    });
+
+    test('should show the skeleton while the first results of a search load', async () => {
+      // Arrange
+      mockUseSearchMovies.mockReturnValue(searchResult({ isLoading: true }));
+      await render(<MoviesScreen />);
+
+      // Act
+      await typeAndCommit('dune');
+
+      // Assert
+      expect(screen.getByLabelText('Cargando películas')).toBeTruthy();
+      expect(screen.getByLabelText(SEARCH_INPUT)).toBeTruthy();
+    });
+
+    test('should show the search error with a retry that repeats the same term', async () => {
+      // Arrange
+      const refetch = jest.fn().mockResolvedValue({ isSuccess: true });
+      mockUseSearchMovies.mockReturnValue(searchResult({ data: undefined, isError: true, refetch }));
+      await render(<MoviesScreen />);
+
+      // Act
+      await typeAndCommit('dune');
+
+      // Assert
+      expect(screen.getByText('No pudimos cargar las películas')).toBeTruthy();
+
+      // Act
+      await fireEvent.press(screen.getByRole('button', { name: 'Reintentar' }));
+
+      // Assert
+      expect(refetch).toHaveBeenCalledTimes(1);
+    });
+
+    test('should return to the popular list when the field is cleared with the clear action', async () => {
+      // Arrange
+      mockUseSearchMovies.mockReturnValue(searchResult({ data: [MOVIE(1), MOVIE(3)] }));
+      await render(<MoviesScreen />);
+      await typeAndCommit('dune');
+      expect(screen.getByText('Resultados para «dune»')).toBeTruthy();
+
+      // Act — the clear action does not wait for the pause
+      await fireEvent.press(screen.getByRole('button', { name: 'Borrar búsqueda' }));
+
+      // Assert
+      expect(lastSearchTerm()).toBe('');
+      expect(screen.getByText('Películas Populares')).toBeTruthy();
+    });
+
+    test('should return to the popular list when the text is deleted and the pause ends', async () => {
+      // Arrange
+      await render(<MoviesScreen />);
+      await typeAndCommit('dune');
+
+      // Act
+      await typeAndCommit('');
+
+      // Assert
+      expect(lastSearchTerm()).toBe('');
+      expect(screen.getByText('Películas Populares')).toBeTruthy();
     });
   });
 });

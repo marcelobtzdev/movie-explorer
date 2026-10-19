@@ -7,6 +7,7 @@ import { EmptyState } from '@/src/components/molecules/EmptyState';
 import { ErrorState } from '@/src/components/molecules/ErrorState';
 import { Header } from '@/src/components/organisms/Header';
 import { LoadingIndicator } from '@/src/components/molecules/LoadingIndicator';
+import { SearchField } from '@/src/components/molecules/SearchField';
 import { ScreenContainer } from '@/src/components/templates/ScreenContainer';
 import { LIST_TUNING } from '@/src/constants/list';
 import { getGenreNames, useMovieGenres } from '@/src/features/genres';
@@ -14,11 +15,15 @@ import { designSystem } from '@/src/theme';
 import { FlashList } from '@shopify/flash-list';
 import { StyleSheet, View } from 'react-native';
 import React, { useCallback, useMemo } from 'react';
+import { Controller } from 'react-hook-form';
 import { MOVIES_STRINGS } from '../constants/strings';
 import { FeaturedMovieCard } from '../components/FeaturedMovieCard';
 import { MovieCard } from '../components/MovieCard';
 import { MoviesSkeleton } from '../components/MoviesSkeleton';
+import { useMovieSearch } from '../hooks/use-movie-search';
 import { usePopularMovies } from '../hooks/use-popular-movies';
+import { useSearchMovies } from '../hooks/use-search-movies';
+import { useMoviesStore } from '../stores/movies-store';
 
 const CATEGORY_TABS = [
   { active: true, label: '🔥 Populares' },
@@ -40,34 +45,48 @@ const BOTTOM_MENU_ITEMS = [
 
 export function MoviesScreen() {
   const genresQuery = useMovieGenres();
-  const moviesQuery = usePopularMovies({ enabled: genresQuery.isSuccess });
+  const searchTerm = useMoviesStore((state) => state.searchTerm);
+  const { clear, control } = useMovieSearch();
+
+  const isSearching = searchTerm.length > 0;
+  const popularQuery = usePopularMovies({ enabled: genresQuery.isSuccess && !isSearching });
+  const searchQuery = useSearchMovies({ enabled: genresQuery.isSuccess, term: searchTerm });
+  // Only the active source drives loading and error states. The popular query keeps its cache while
+  // a search is shown, so clearing the search does not refetch it.
+  const activeQuery = isSearching ? searchQuery : popularQuery;
 
   const genreLookup = useMemo(
     () => new Map((genresQuery.data ?? []).map((genre) => [genre.genreId, genre.name])),
     [genresQuery.data],
   );
 
-  const movies = moviesQuery.data ?? [];
+  const movies = activeQuery.data ?? [];
   const featured = movies[0];
   const gridMovies = movies.slice(1);
 
   const handleRetryInitial = useCallback(() => {
+    if (isSearching) {
+      searchQuery.refetch();
+      return;
+    }
+
     genresQuery.refetch().then((genresResult) => {
       if (genresResult.isSuccess) {
-        moviesQuery.refetch();
+        popularQuery.refetch();
       }
     });
-  }, [genresQuery, moviesQuery]);
+  }, [genresQuery, isSearching, popularQuery, searchQuery]);
 
   const handleRetryNextPage = useCallback(() => {
-    moviesQuery.fetchNextPage();
-  }, [moviesQuery]);
+    popularQuery.fetchNextPage();
+  }, [popularQuery]);
 
   const handleEndReached = useCallback(() => {
-    if (moviesQuery.hasNextPage && !moviesQuery.isFetchingNextPage && !moviesQuery.isError) {
-      moviesQuery.fetchNextPage();
+    // Search results are a single page, so there is never a next page to load while searching.
+    if (!isSearching && popularQuery.hasNextPage && !popularQuery.isFetchingNextPage && !popularQuery.isError) {
+      popularQuery.fetchNextPage();
     }
-  }, [moviesQuery]);
+  }, [isSearching, popularQuery]);
 
   const renderItem = useCallback(
     ({ item }: { readonly item: Movie }) => (
@@ -80,11 +99,16 @@ export function MoviesScreen() {
 
   const keyExtractor = useCallback((item: Movie) => String(item.movieId), []);
 
-  const isInitialLoading = genresQuery.isLoading || moviesQuery.isLoading;
-  // moviesQuery.isError stays true for a failed fetchNextPage even once the first page has
-  // already succeeded (its data is preserved), so "initial" failure must also check that no
-  // page has ever loaded yet — otherwise a footer-only failure would wrongly blank the whole list.
-  const isInitialError = genresQuery.isError || (moviesQuery.isError && moviesQuery.data === undefined);
+  const isInitialLoading = genresQuery.isLoading || activeQuery.isLoading;
+  // A failed fetchNextPage keeps isError true while the loaded pages stay in data, so "initial"
+  // failure must also require that no data has ever loaded — otherwise a footer-only failure would
+  // wrongly blank the whole list.
+  const isInitialError = genresQuery.isError || (activeQuery.isError && activeQuery.data === undefined);
+  const showList = !isInitialLoading && !isInitialError && movies.length > 0;
+
+  const sectionTitle = isSearching
+    ? MOVIES_STRINGS.searchResultsTitle(searchTerm)
+    : MOVIES_STRINGS.sectionTitle;
 
   const listHeader = useMemo(
     () => (
@@ -98,19 +122,19 @@ export function MoviesScreen() {
           </View>
         ) : null}
         <Text size="lg" weight="bold">
-          {MOVIES_STRINGS.sectionTitle}
+          {sectionTitle}
         </Text>
       </View>
     ),
-    [featured, genreLookup],
+    [featured, genreLookup, sectionTitle],
   );
 
   const listFooter = useMemo(() => {
-    if (moviesQuery.isFetchingNextPage) {
+    if (!isSearching && popularQuery.isFetchingNextPage) {
       return <LoadingIndicator accessibilityLabel={MOVIES_STRINGS.sectionTitle} />;
     }
 
-    if (moviesQuery.isError && !isInitialError) {
+    if (!isSearching && popularQuery.isError && !isInitialError) {
       return (
         <View style={styles.footerError}>
           <Text align="center" color="secondary" size="sm">
@@ -122,47 +146,63 @@ export function MoviesScreen() {
     }
 
     return null;
-  }, [handleRetryNextPage, isInitialError, moviesQuery.isError, moviesQuery.isFetchingNextPage]);
+  }, [handleRetryNextPage, isInitialError, isSearching, popularQuery.isError, popularQuery.isFetchingNextPage]);
 
   return (
     <ScreenContainer>
       <Header subtitle={MOVIES_STRINGS.subtitle} />
 
-      {isInitialLoading ? (
+      {/* Kept at the same position in every state so the field (and the keyboard) is not remounted. */}
+      <View style={styles.search}>
+        <Controller
+          control={control}
+          name="query"
+          render={({ field: { onChange, value } }) => (
+            <SearchField
+              accessibilityLabel={MOVIES_STRINGS.searchAccessibilityLabel}
+              clearAccessibilityLabel={MOVIES_STRINGS.clearSearchLabel}
+              onChangeText={onChange}
+              onClear={clear}
+              placeholder={MOVIES_STRINGS.searchPlaceholder}
+              value={value}
+            />
+          )}
+        />
+      </View>
+
+      {showList ? (
+        <FlashList
+          contentContainerStyle={styles.listContent}
+          data={gridMovies}
+          drawDistance={LIST_TUNING.drawDistance}
+          keyboardDismissMode="on-drag"
+          keyboardShouldPersistTaps="handled"
+          keyExtractor={keyExtractor}
+          ListFooterComponent={listFooter}
+          ListHeaderComponent={listHeader}
+          numColumns={LIST_TUNING.numColumns}
+          onEndReached={handleEndReached}
+          onEndReachedThreshold={0.5}
+          renderItem={renderItem}
+        />
+      ) : isInitialLoading ? (
         <MoviesSkeleton />
       ) : (
         <>
-          {isInitialError || movies.length === 0 ? (
-            <View style={styles.standaloneTabs}>
-              <CategoryTabs items={CATEGORY_TABS} />
-            </View>
-          ) : null}
-          {isInitialError ? (
-            <View style={styles.centeredArea}>
+          <View style={styles.standaloneTabs}>
+            <CategoryTabs items={CATEGORY_TABS} />
+          </View>
+          <View style={styles.centeredArea}>
+            {isInitialError ? (
               <ErrorState
                 message={MOVIES_STRINGS.initialErrorMessage}
                 onRetry={handleRetryInitial}
                 title={MOVIES_STRINGS.initialErrorTitle}
               />
-            </View>
-          ) : movies.length === 0 ? (
-            <View style={styles.centeredArea}>
-              <EmptyState message={MOVIES_STRINGS.emptyMessage} />
-            </View>
-          ) : (
-            <FlashList
-              contentContainerStyle={styles.listContent}
-              data={gridMovies}
-              drawDistance={LIST_TUNING.drawDistance}
-              keyExtractor={keyExtractor}
-              ListFooterComponent={listFooter}
-              ListHeaderComponent={listHeader}
-              numColumns={LIST_TUNING.numColumns}
-              onEndReached={handleEndReached}
-              onEndReachedThreshold={0.5}
-              renderItem={renderItem}
-            />
-          )}
+            ) : (
+              <EmptyState message={isSearching ? MOVIES_STRINGS.searchEmptyMessage(searchTerm) : MOVIES_STRINGS.emptyMessage} />
+            )}
+          </View>
         </>
       )}
 
@@ -195,6 +235,10 @@ const styles = StyleSheet.create({
   listHeader: {
     paddingBottom: designSystem.spacing.md,
     paddingHorizontal: GRID_GUTTER,
+  },
+  search: {
+    marginBottom: designSystem.spacing.md,
+    paddingHorizontal: SCREEN_GUTTER,
   },
   standaloneTabs: {
     marginBottom: designSystem.spacing.lg,

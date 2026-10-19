@@ -8,4 +8,9 @@ export const moviesService = {
     const { data } = await tmdbClient.get<MoviePageResponseDto>('/movie/popular', { params: { page }, signal });
     return mapMoviePage(data);
   },
+  searchMovies: async ({ query, signal }: { query: string; signal?: AbortSignal }): Promise<MoviePage> => {
+    // Only `query` is sent; `language` comes from tmdbClient defaults and `include_adult` keeps TMDB's default (false).
+    const { data } = await tmdbClient.get<MoviePageResponseDto>('/search/movie', { params: { query }, signal });
+    return mapMoviePage(data);
+  },
 };

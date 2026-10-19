@@ -17,7 +17,8 @@ export const mapMovie = (dto: MovieResponseDto): Movie => ({
   backdropPath: dto.backdrop_path,
   genreIds: dto.genre_ids,
   movieId: dto.id,
-  posterPath: dto.poster_path,
+  // `?? null` covers results where TMDB returns a misspelled key (e.g. `posterh`) and the field is absent.
+  posterPath: dto.poster_path ?? null,
   releaseYear: parseReleaseYear(dto.release_date),
   title: dto.title,
   voteAverage: dto.vote_average > 0 ? dto.vote_average : null,
