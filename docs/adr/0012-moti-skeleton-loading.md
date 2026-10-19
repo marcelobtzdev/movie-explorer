@@ -1,6 +1,6 @@
 # ADR-0012: Moti Skeleton for loading placeholders
 
-**Status**: Accepted
+**Status**: Superseded by ADR-0013
 **Date**: 2026-10-18
 
 ## Context

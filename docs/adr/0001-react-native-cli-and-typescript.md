@@ -9,7 +9,7 @@ The assessment requires a mobile app built with React Native CLI and TypeScript,
 
 ## Decision
 
-Use a bare React Native project created with the React Native CLI (not Expo) and TypeScript in strict mode. Hermes stays enabled. pnpm is the package manager with node-linker=hoisted (required by React Native tooling). Environment values are loaded with react-native-config from a git-ignored .env and validated with Zod at startup.
+Use a bare React Native project created with the React Native CLI (not Expo) and TypeScript in strict mode. Hermes stays enabled. pnpm is the package manager with every dependency hoisted (`nodeLinker: hoisted` in `pnpm-workspace.yaml` — not `.npmrc`, which pnpm silently ignores for this setting once `pnpm-workspace.yaml` exists; required by React Native's Gradle tooling, which hardcodes a flat `node_modules` layout). Environment values are loaded with react-native-config from a git-ignored .env and validated with Zod at startup.
 
 ## Consequences
 

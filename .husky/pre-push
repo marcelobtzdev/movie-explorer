@@ -1,0 +1,2 @@
+npx commitlint --from=origin/main --to=HEAD
+npm run pr:check

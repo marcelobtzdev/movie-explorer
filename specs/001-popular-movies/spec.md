@@ -14,7 +14,7 @@
 
 When a user opens the app, they land on the main screen of MovieExplorer. They see the app name with the subtitle "Populares" and a static avatar, a row of category tabs, a featured card with the first popular movie, the section title "Películas Populares" and, below it, a two-column grid with the remaining popular movies, plus a bottom menu.
 
-The featured card shows the movie's wide image, a "#1 TENDENCIA" label, its rating, its title, its genre names and its release year. Each grid card shows the poster, a rating badge over the top-right corner of the poster, the title on a single line and a footer with the release year and genre names (for example "2023 • Acción / Aventura").
+The featured card shows the movie's wide image, its rating, its title, its genre names and its release year. Each grid card shows the poster, a rating badge over the top-right corner of the poster, the title on a single line and a footer with the release year and genre names (for example "2023 • Acción / Aventura").
 
 **Why this priority**: This is the first thing every user sees and the sole reason to open the app at this stage. It is the minimum independently shippable and demonstrable slice.
 
@@ -25,7 +25,7 @@ The featured card shows the movie's wide image, a "#1 TENDENCIA" label, its rati
 1. **Given** the app has just launched and the movie data service responds successfully, **When** the main screen finishes loading, **Then** the user sees the header ("MovieExplorer", subtitle "Populares", avatar), the category tabs with "Populares" active, the featured card, the section title "Películas Populares", a two-column grid and the bottom menu.
 2. **Given** the service returns a list of movies, **When** the screen renders, **Then** the featured card shows the first movie of the list and the grid shows the remaining movies in the order returned, without repeating the featured movie.
 3. **Given** a grid movie, **When** its card renders, **Then** it shows the poster, a rating badge with a star and the rating with one decimal, the title on one line (ellipsis if it overflows) and a footer with the release year and up to two genre names (for example "2023 • Acción / Aventura"), with no other labels or icons.
-4. **Given** the featured movie, **When** its card renders, **Then** it shows the wide image, the "#1 TENDENCIA" label, the rating with one decimal over "/ 10 TMDB", the title, up to three genre names and the release year.
+4. **Given** the featured movie, **When** its card renders, **Then** it shows the wide image, the rating with one decimal over "/ 10 TMDB", the title, up to three genre names and the release year.
 5. **Given** a movie with no poster (or no wide image for the featured card), **When** its card renders, **Then** a neutral placeholder is shown instead of a broken or empty image area.
 6. **Given** a movie has no rating value, **When** its card renders, **Then** a dash is shown in place of a number.
 7. **Given** a movie has no release date, **When** its card renders, **Then** a dash is shown in place of the year.
@@ -91,7 +91,7 @@ At every point the user can tell the state of the screen: loading the first time
 - **FR-001**: The main screen MUST be the first screen shown when the app opens, on both Android and iOS, and MUST display the popular movies as described in this spec.
 - **FR-002**: The header MUST show the app name "MovieExplorer", the subtitle "Populares" and a static avatar that is not interactive. It MUST NOT include a search icon.
 - **FR-003**: The screen MUST show category tabs "Populares", "Mejor Valoradas" and "En Cartelera", with "Populares" active. The other tabs MUST do nothing when pressed and MUST be exposed to accessibility as unavailable.
-- **FR-004**: The screen MUST show a featured card with the first movie of the list, containing its wide image, the "#1 TENDENCIA" label, its rating with one decimal and "/ 10 TMDB", its title (up to two lines), up to three genre names and its release year. The featured movie MUST NOT be repeated in the grid and MUST remain the first movie of the first batch as more batches load.
+- **FR-004**: The screen MUST show a featured card with the first movie of the list, containing its wide image, its rating with one decimal and "/ 10 TMDB", its title (up to two lines), up to three genre names and its release year. The featured movie MUST NOT be repeated in the grid and MUST remain the first movie of the first batch as more batches load.
 - **FR-005**: The screen MUST show the section title "Películas Populares" followed by a two-column grid with the remaining movies.
 - **FR-006**: Each grid card MUST show the poster, a rating badge over the poster's top-right corner (star plus rating with exactly one decimal), the title on a single line with an ellipsis for overflow, and a footer with only the release year and up to two genre names in the form "2023 • Acción / Aventura". The footer MUST NOT contain labels, arrows or other icons.
 - **FR-007**: The system MUST show a neutral placeholder when a movie has no poster or wide image, and MUST fall back to it if the image fails to load.
@@ -132,7 +132,6 @@ At every point the user can tell the state of the screen: loading the first time
 ## Assumptions
 
 - Movies are displayed in the order the service returns them (no client-side sorting or filtering); the first one is the featured movie.
-- The "#1 TENDENCIA" label always accompanies the featured card, which is the first record.
 - The release year comes from the release date provided by the service; genre names come from the genre catalog, which is requested before the movie list; the first screen state (skeleton, error) covers both requests, and a failed genre request is handled like a failed initial load (error state with "Reintentar").
 - The tabs and bottom menu other than "Populares" are visual only in this feature; category switching, favorites and other sections are out of scope.
 - The app has a single dark theme.

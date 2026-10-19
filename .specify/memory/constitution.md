@@ -1,19 +1,26 @@
 <!--
 Sync Impact Report
 ==================
-Version change: TEMPLATE → 1.0.0 (initial ratification)
-Modified principles: N/A (first ratified version)
-Added sections:
-  - Project Context and Scope
-  - Core Principles I–XIII (Feature Slice Architecture; Navigation with React Navigation;
-    Server State with TanStack Query v5; Client State with Zustand v5; Forms and Validation
-    with Zod + React Hook Form; UI: Custom Components and Styling; Performance and
-    Optimization; Vendor Wrappers; TMDB Data Access, Mapping and Error Handling; Naming and
-    Code Conventions; Testing; Tooling, Quality Gates and Delivery; Architecture Decision
-    Records)
-  - Spec Kit Workflow Rules
-  - Governance
-Removed sections: N/A
+Version change: 1.2.0 → 1.2.1
+Modified principles:
+  - Project Context and Scope — corrected where the pnpm node-linker setting must live: this
+    project also has a `pnpm-workspace.yaml` (holding `minimumReleaseAgeExclude`), and once that
+    file exists, pnpm 12.x sources `nodeLinker` from `pnpm-workspace.yaml`'s own key, not from
+    `.npmrc`'s `node-linker` — the latter is silently ignored. `.npmrc` keeps the setting too
+    (harmless, read by older tooling), but `pnpm-workspace.yaml`'s `nodeLinker: hoisted` is the
+    one that actually takes effect.
+  - XII. Tooling, Quality Gates and Delivery — same correction, in the pnpm bullet.
+Added sections: none
+Removed sections: none
+Rationale: discovered only after a real `pnpm android` run failed with `Included build
+  '.../node_modules/@react-native/gradle-plugin' does not exist` — confirmed via
+  `node_modules/.modules.yaml` that `nodeLinker` was resolving to `isolated` despite `.npmrc`
+  saying otherwise, and that adding `nodeLinker: hoisted` to `pnpm-workspace.yaml` is what
+  actually fixes it (see `specs/001-popular-movies/research.md`'s eighth finding). PATCH: a
+  factual correction to where an existing requirement's setting lives, not a change to what is
+  required.
+Follow-up: `pnpm-workspace.yaml` now carries `nodeLinker: hoisted`; `README.md` and
+  `docs/adr/0001-react-native-cli-and-typescript.md` updated to match.
 Templates requiring follow-up: none — this command does not modify dependent templates;
   /speckit-plan, /speckit-tasks and /speckit-analyze read this constitution at runtime.
 Follow-up TODOs: none.
@@ -29,8 +36,11 @@ mobile-development practices and an efficient, scalable app.
 
 Technology: the project uses React Native CLI (bare workflow) and TypeScript in strict mode.
 Zustand is the global state manager (justified in ADR-0004). Navigation uses React Navigation.
-The package manager is pnpm (with `node-linker=hoisted` in `.npmrc`, required for React
-Native). Supported platforms are Android AND iOS; the app MUST compile and run without errors
+The package manager is pnpm, configured to hoist every dependency (`nodeLinker: hoisted` in
+`pnpm-workspace.yaml` — the setting that actually takes effect once that file exists, not
+`.npmrc`'s `node-linker`; required for React Native's Gradle setup, which hardcodes a flat
+`node_modules` layout). Supported platforms are Android AND iOS; the app MUST compile and run
+without errors
 on both.
 
 ### Functional scope
@@ -52,7 +62,7 @@ The current functional scope is the following:
 5. **Main screen layout**: the movies screen has a header with the visible app name
    "MovieExplorer", the subtitle of the active category and a static avatar; category tabs
    (Populares, Mejor Valoradas, En Cartelera); a featured card showing the first movie of the
-   list (wide image, rating, release year and genre names, plus the "#1 TENDENCIA" label); the
+   list (wide image, rating, release year and genre names); the
    section title "Películas Populares" followed by the grid with the remaining movies; and a
    bottom menu (Populares, Cartelera, Mejor Valoradas, Favoritos). Only Populares is
    functional: the other category tabs and bottom-menu items are visual only, do nothing when
@@ -94,7 +104,7 @@ added following the dependency rule of Principle XII.
 | Environment variables | `react-native-config` + Zod validation |
 | Lists | `@shopify/flash-list` v2 |
 | Images | React Native `Image` (with `Image.prefetch`), custom `Poster` atom with placeholder |
-| Skeleton loading | `moti` (`moti/skeleton`) on `react-native-reanimated` (+ `react-native-worklets` when required), wrapped by the `Skeleton` atom (ADR-0012) |
+| Skeleton loading | A project-owned shimmer component (`src/components/atoms/Skeleton`) built directly on `react-native-reanimated` and `react-native-linear-gradient` — no third-party skeleton package (ADR-0013, supersedes ADR-0012) |
 | Icons | Emoji glyphs and text/`View` shapes (no package) |
 | Gradients | `react-native-linear-gradient` (required by the Moti skeleton; also used for the featured-card overlay), wrapped in `vendors/linear-gradient` |
 | Connectivity | `@react-native-community/netinfo` |
@@ -106,7 +116,7 @@ added following the dependency rule of Principle XII.
 | Production console removal | `babel-plugin-transform-remove-console` |
 | Path alias | `babel-plugin-module-resolver` + `tsconfig` paths |
 | Dev debugging | `reactotron-react-native` (dev only) |
-| Package manager | `pnpm` with `node-linker=hoisted` |
+| Package manager | `pnpm` with `nodeLinker: hoisted` (`pnpm-workspace.yaml`) |
 
 ### Priorities when trade-offs arise
 
@@ -395,22 +405,36 @@ Atomic Design is used for shared components in `src/components/`:
 
 | Level | Folder | Examples | Description |
 |---|---|---|---|
-| Atom | `atoms/` | Button, Text, TextInput, Poster, Rating, Icon, Avatar, Chip, Skeleton | Primitive, indivisible UI elements (`Skeleton` wraps Moti, ADR-0012) |
+| Atom | `atoms/` | Button, Text, TextInput, Poster, Rating, Icon, Avatar, Chip, Skeleton | Primitive, indivisible UI elements (`Skeleton` is a custom shimmer component, ADR-0013) |
 | Molecule | `molecules/` | SearchField, EmptyState, ErrorState, LoadingIndicator, CategoryTabs | Composed atoms, still generic |
 | Organism | `organisms/` | Header, BottomMenu, NetworkErrorOverlay, ServerErrorOverlay, Toast | Complex components with internal logic (`BottomMenu` is visual only) |
 | Template | `templates/` | ScreenContainer, ErrorBoundary | Page-level layouts and structural wrappers |
 
 Feature-specific components (e.g., `FeaturedMovieCard`, `MovieCard`, `MoviesSkeleton`) live in
-`src/features/[feature]/components/`. Each component lives in its own folder with co-located
-styles and tests:
+`src/features/[feature]/components/`. Each component lives in its own folder with a co-located
+test:
 
 ```
 components/atoms/Button/
-├── Button.tsx
-├── Button.styles.ts
+├── Button.tsx           # component AND its StyleSheet.create block, in the same file
 ├── Button.test.tsx
-└── index.ts            # re-exports Button
+└── index.ts             # re-exports Button
 ```
+
+**Styles live in the same file as the component or screen they style** — a `StyleSheet.create`
+call at the bottom of the `.tsx` file, not in a separate `ComponentName.styles.ts`. Keeping the
+JSX and its styles in one file keeps the two in sync by construction (no cross-file scrolling to
+check what a style name maps to) and makes a component's true size visible at a glance. Inline
+style objects on JSX elements are still flagged by `react-native/no-inline-styles`; only the
+single `StyleSheet.create` block at the end of the file is exempt.
+
+**A large `StyleSheet.create` block is a decomposition signal, not something to extract into its
+own file.** When a component's styles grow long enough to make the file hard to scan (as a
+rough guide: noticeably more style keys than JSX elements, or the kind of length where you have
+to scroll past styles to find the logic), that is evidence the component is doing too much and
+should be split into smaller child components — each with its own small, co-located style
+block — rather than filed away in a same-sized-but-separate `.styles.ts`. Moving styles to
+another file hides the signal instead of acting on it.
 
 Styles are defined with `StyleSheet.create` (inline styles are flagged by
 `react-native/no-inline-styles`) and take colors, spacing and font sizes from `designSystem`.
@@ -454,12 +478,14 @@ const styles = StyleSheet.create({
 })
 ```
 
-Skeleton loading: skeletons use Moti's `Skeleton` (shimmer effect, animation on the UI thread
-through Reanimated), as recorded in ADR-0012. The `Skeleton` atom in
-`src/components/atoms/Skeleton` is the only skeleton API used by screens; it applies the
-`skeleton.base` / `skeleton.highlight` tokens (dark mode colors). All blocks of a screen are
-grouped in one `Skeleton.Group` so they animate in sync, and the skeleton screen mirrors the
-dimensions of the final layout to avoid layout shift.
+Skeleton loading: the `Skeleton` atom in `src/components/atoms/Skeleton` is a project-owned
+component (shimmer effect, animation on the UI thread through `react-native-reanimated`, the
+gradient sweep via `react-native-linear-gradient`), as recorded in ADR-0013 (supersedes
+ADR-0012, which had assumed a `moti` entry point that does not exist in the published
+package). It is the only skeleton API used by screens; it applies the `skeleton.base` /
+`skeleton.highlight` tokens (dark mode colors). All blocks of a screen are grouped in one
+`Skeleton.Group` (a React Context provided by the same component) so they animate in sync, and
+the skeleton screen mirrors the dimensions of the final layout to avoid layout shift.
 
 UI states (present on every data-driven screen, all visible to the user):
 
@@ -568,8 +594,7 @@ APIs behind a stable interface, and ease testing and future swaps.
 | `vendors/react-query/ReactQueryProvider.tsx` | `QueryClientProvider` | Provider component |
 | `vendors/netinfo/index.ts` | `@react-native-community/netinfo` | Connectivity subscription used by `useNetworkStatus` |
 | `vendors/react-navigation/ReactNavigationProvider.tsx` | `@react-navigation/native` | `NavigationContainer` + theme provider |
-| `vendors/moti/index.ts` | `moti`, `react-native-reanimated` | Moti skeleton (`moti/skeleton/react-native-linear-gradient`) used by the `Skeleton` atom |
-| `vendors/linear-gradient/index.ts` | `react-native-linear-gradient` | `LinearGradient` used by the featured card overlay and the skeleton |
+| `vendors/linear-gradient/index.ts` | `react-native-linear-gradient` | `LinearGradient` used by the featured card overlay and the skeleton shimmer |
 | `vendors/reactotron/index.ts` | `reactotron-react-native` | Dev-only Reactotron instance (imported only inside `__DEV__`) |
 
 No monitoring/analytics/crash-reporting SDK is configured at this time. If one is added, it
@@ -716,7 +741,6 @@ File naming:
 | Schema (Zod) | `kebab-case.schema.ts` | `search.schema.ts` |
 | Mapper | `kebab-case.mapper.ts` | `movie.mapper.ts` |
 | DTO | `kebab-case-response.dto.ts` | `movie-response.dto.ts` |
-| Styles | `ComponentName.styles.ts` | `Button.styles.ts` |
 | Test | `[source-file].test.ts(x)` | `use-popular-movies.test.ts` |
 | Error class | `kebab-case-error.ts` | `movie-detail-error.ts` |
 | Utility | `kebab-case.utils.ts` | `tmdb-image.utils.ts` |
@@ -740,7 +764,7 @@ Barrel exports: every component folder has an `index.ts` re-exporting the public
 between groups): 1) type imports 2) react 3) react-native 4) third-party packages 5) absolute
 `@/` imports in order: types, navigation, hooks, stores, services, providers, vendors,
 constants, components, assets 6) parent directory (`../`) 7) relative in order: types,
-constants, hooks, services, utils, components, styles.
+constants, hooks, services, utils, components.
 
 **Sorting** (ESLint-enforced, production code): object keys (`perfectionist/sort-objects`),
 interface fields (`sort-interfaces`), JSX props (`sort-jsx-props`: multiline first, then
@@ -781,8 +805,11 @@ File placement: tests are colocated with the source file (`use-popular-movies.ts
 `use-popular-movies.test.ts`), named `[subject].test.ts` or `[subject].test.tsx`.
 
 Coverage scope: collected from `src/**/*.{ts,tsx}` excluding `*.d.ts`, `*.test.*`, `*.mock.*`,
-`*.stories.*`; `**/types.ts`, `**/constants.ts`, `**/styles.ts`; `**/strings.ts`,
-`src/constants/**`, `src/assets/**`; `src/vendors/**`; `src/utils/test-utils.tsx`; DTO files.
+`*.stories.*`; `**/types.ts`, `**/constants.ts`; `**/strings.ts`, `src/constants/**`,
+`src/assets/**`; `src/vendors/**`; `src/utils/test-utils.tsx`; DTO files. Styles are no longer a
+separate excludable file (they live inside each component/screen file per Principle VI); a
+`StyleSheet.create` call does not need its own exclusion since rendering the component already
+exercises it.
 
 Test structure:
 
@@ -812,14 +839,17 @@ Custom render: `src/utils/test-utils.tsx` exports a `render` wrapping `QueryClie
 
 Environment: `TZ=UTC` for all runs; `haste.defaultPlatform: 'ios'` in the Jest config;
 `react-native-config` is mocked in the Jest setup, and the Jest setup includes
-`@shopify/flash-list/jestSetup` so FlashList can render in tests, and the Reanimated Jest
-mock so Moti components render (ADR-0012). The Reanimated/worklets Babel plugin is the last
+`@shopify/flash-list/jestSetup` so FlashList can render in tests, and
+`react-native-reanimated`'s own test setup (`setUpTests()`) so the `Skeleton` atom's shimmer
+animation renders in tests (ADR-0013). The Reanimated Babel plugin is the last
 plugin in `babel.config.js`. Tests run against mocked
 data and never need the real TMDB API.
 
 ### XII. Tooling, Quality Gates and Delivery
 
-- The package manager is pnpm (with `node-linker=hoisted`); the pnpm lockfile is the only
+- The package manager is pnpm (with `nodeLinker: hoisted` in `pnpm-workspace.yaml` — not
+  `.npmrc`, which pnpm 12.x ignores for this setting once `pnpm-workspace.yaml` exists); the
+  pnpm lockfile is the only
   lockfile committed.
 - Commits follow Conventional Commits (`@commitlint/config-conventional`), enforced by Husky.
   Format: `<type>(<optional scope>): <description>` + optional body. Types: `feat`, `fix`,
@@ -872,7 +902,8 @@ Current ADRs:
 | 0009 | TMDB access via a dedicated Axios client |
 | 0010 | List, search and image performance strategy |
 | 0011 | FlashList for all data lists |
-| 0012 | Moti Skeleton for loading placeholders |
+| 0012 | Moti Skeleton for loading placeholders (superseded by ADR-0013) |
+| 0013 | Custom shimmer Skeleton |
 
 ## Spec Kit Workflow Rules
 
@@ -902,4 +933,4 @@ redefining a principle, MINOR for adding a principle or materially expanding gui
 (Constitution Check), by `/speckit-analyze` (a constitution conflict is CRITICAL), and in code
 review. Violations require explicit justification in the plan's Complexity Tracking table.
 
-**Version**: 1.0.0 | **Ratified**: 2026-10-17 | **Last Amended**: 2026-10-17
+**Version**: 1.2.1 | **Ratified**: 2026-10-17 | **Last Amended**: 2026-10-18
