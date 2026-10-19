@@ -8,19 +8,15 @@ Funcionalidades implementadas: películas populares con scroll infinito, búsque
 
 ## Desarrollo guiado por especificaciones (SDD) con Spec Kit
 
-[**Spec Kit**](https://speckit.org/) es una herramienta de código abierto creada por GitHub para el **Spec-Driven Development (SDD)**: el desarrollo guiado por especificaciones. Según su sitio oficial, _"las especificaciones se vuelven ejecutables"_: en lugar de escribir código sin una definición previa, el equipo describe qué construir y por qué, y un agente de IA genera la implementación a partir de esa descripción. El objetivo es centrarse en los escenarios del producto y no en el código repetitivo.
+Este proyecto se desarrolla con [**Spec Kit**](https://speckit.org/), una herramienta de código abierto creada por GitHub para el **desarrollo guiado por especificaciones** (_Spec-Driven Development_, SDD) impulsado por **IA**. Según su sitio oficial:
 
-Este proyecto usa Spec Kit con su flujo de comandos. Estos son los comandos de referencia de Spec Kit y los nombres con los que están instalados aquí (`/speckit-*`, en `.claude/skills/`):
+> "Spec Kit revolutionizes software development by making specifications executable. With Spec Kit, transform your ideas into working code using AI-powered specification-driven development."
 
-| Comando oficial | Comando en este proyecto | Qué hace                                                               | Cuándo se usa                                                                                  |
-| --------------- | ------------------------ | ---------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
-| `/constitution` | `/speckit-constitution`  | Crea los principios y las reglas de desarrollo del proyecto            | Primero, para establecer los estándares (`.specify/memory/constitution.md`)                    |
-| `/specify`      | `/speckit-specify`       | Define qué construir: requisitos e historias de usuario                | Enfocado en el _qué_ y el _por qué_, no en el stack (`specs/NNN-nombre/spec.md`)               |
-| `/clarify`      | `/speckit-clarify`       | Aclara las partes poco especificadas con preguntas estructuradas       | Debe ejecutarse antes de `/plan`, salvo que se omita explícitamente                            |
-| `/plan`         | `/speckit-plan`          | Crea el plan técnico con el stack elegido                              | Define arquitectura, frameworks y decisiones técnicas (`plan.md`, `research.md`, `contracts/`) |
-| `/tasks`        | `/speckit-tasks`         | Genera la lista de tareas accionables                                  | Divide el plan en pasos ejecutables (`tasks.md`)                                               |
-| `/analyze`      | `/speckit-analyze`       | Revisa la consistencia y la cobertura entre artefactos                 | Después de `/tasks` y antes de `/implement`. Solo lectura                                      |
-| `/implement`    | `/speckit-implement`     | Ejecuta todas las tareas para construir la funcionalidad según el plan | Genera el código funcional a partir de las especificaciones                                    |
+En español: Spec Kit revoluciona el desarrollo de software al hacer que las especificaciones sean ejecutables. Con Spec Kit, las ideas se convierten en código funcional mediante un desarrollo guiado por especificaciones impulsado por IA.
+
+> "With Spec Kit, specifications become executable, directly generating working implementations. Spec Kit helps you focus on product scenarios rather than writing undifferentiated code."
+
+En español: con Spec Kit las especificaciones son ejecutables y generan implementaciones funcionales directamente. Así el equipo se concentra en los escenarios del producto y no en escribir código repetitivo.
 
 Las funcionalidades especificadas hasta ahora son: `001-popular-movies` (listado popular y estructura inicial del proyecto), `002-movie-search` (búsqueda), `003-movie-detail` (detalle de película) y `004-dev-error-simulation` (simulación de errores para desarrollo). Las decisiones de arquitectura se registran aparte como ADR en [`docs/adr/`](./docs/adr).
 
