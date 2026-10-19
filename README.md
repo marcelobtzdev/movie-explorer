@@ -6,6 +6,42 @@ Las decisiones de arquitectura están en [`docs/adr/`](./docs/adr). Las reglas d
 
 Funcionalidades implementadas: películas populares con scroll infinito, búsqueda por título y detalle de película. En [Características](#características) se explica qué hace cada una y por qué se eligió cada librería.
 
+## Índice
+
+- [Desarrollo guiado por especificaciones (SDD) con Spec Kit](#desarrollo-guiado-por-especificaciones-sdd-con-spec-kit)
+- [Características](#características)
+  - [1. Lista de películas populares](#1-lista-de-películas-populares)
+  - [2. Scroll infinito (paginación)](#2-scroll-infinito-paginación)
+  - [3. Búsqueda por título](#3-búsqueda-por-título)
+  - [4. Detalle de película](#4-detalle-de-película)
+  - [5. Estados de carga, error, vacío y sin conexión](#5-estados-de-carga-error-vacío-y-sin-conexión)
+  - [6. Imágenes](#6-imágenes)
+  - [7. Accesibilidad y diseño](#7-accesibilidad-y-diseño)
+  - [8. Configuración y calidad](#8-configuración-y-calidad)
+  - [9. Simulación de errores (solo desarrollo)](#9-simulación-de-errores-solo-desarrollo)
+- [Stack tecnológico](#stack-tecnológico)
+  - [Núcleo](#núcleo)
+  - [Librerías de la app](#librerías-de-la-app)
+  - [Datos y caché](#datos-y-caché)
+  - [Herramientas de calidad](#herramientas-de-calidad)
+  - [Estructura del proyecto](#estructura-del-proyecto)
+- [Requisitos previos](#requisitos-previos)
+- [1. Obtén un token de TMDB](#1-obtén-un-token-de-tmdb)
+- [2. Configura las variables de entorno](#2-configura-las-variables-de-entorno)
+- [3. Instala las dependencias](#3-instala-las-dependencias)
+- [4. Ejecuta la app](#4-ejecuta-la-app)
+  - [Android](#android)
+  - [iOS (solo macOS)](#ios-solo-macos)
+- [Probar el manejo de errores](#probar-el-manejo-de-errores)
+  - [Cómo activar la simulación](#cómo-activar-la-simulación)
+  - [Qué se ve en pantalla](#qué-se-ve-en-pantalla)
+  - [Pasos para probar](#pasos-para-probar)
+  - [Resultados esperados](#resultados-esperados)
+  - [Límites de la simulación](#límites-de-la-simulación)
+  - [Pruebas automáticas del manejo de errores](#pruebas-automáticas-del-manejo-de-errores)
+- [Scripts](#scripts)
+- [Solución de problemas](#solución-de-problemas)
+
 ## Desarrollo guiado por especificaciones (SDD) con Spec Kit
 
 Este proyecto se desarrolla con [**Spec Kit**](https://speckit.org/), una herramienta de código abierto creada por GitHub para el **desarrollo guiado por especificaciones** (_Spec-Driven Development_, SDD) impulsado por **IA**. Según su sitio oficial:
