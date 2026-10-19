@@ -10,14 +10,6 @@ Funcionalidades implementadas: películas populares con scroll infinito, búsque
 
 Este proyecto se desarrolla con [**Spec Kit**](https://speckit.org/), una herramienta de código abierto creada por GitHub para el **desarrollo guiado por especificaciones** (_Spec-Driven Development_, SDD) impulsado por **IA**. Según su sitio oficial:
 
-> "Spec Kit revolutionizes software development by making specifications executable. With Spec Kit, transform your ideas into working code using AI-powered specification-driven development."
-
-En español: Spec Kit revoluciona el desarrollo de software al hacer que las especificaciones sean ejecutables. Con Spec Kit, las ideas se convierten en código funcional mediante un desarrollo guiado por especificaciones impulsado por IA.
-
-> "With Spec Kit, specifications become executable, directly generating working implementations. Spec Kit helps you focus on product scenarios rather than writing undifferentiated code."
-
-En español: con Spec Kit las especificaciones son ejecutables y generan implementaciones funcionales directamente. Así el equipo se concentra en los escenarios del producto y no en escribir código repetitivo.
-
 Las funcionalidades especificadas hasta ahora son: `001-popular-movies` (listado popular y estructura inicial del proyecto), `002-movie-search` (búsqueda), `003-movie-detail` (detalle de película) y `004-dev-error-simulation` (simulación de errores para desarrollo). Las decisiones de arquitectura se registran aparte como ADR en [`docs/adr/`](./docs/adr).
 
 ## Características
