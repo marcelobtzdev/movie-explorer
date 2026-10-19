@@ -6,21 +6,21 @@ Las decisiones de arquitectura están en [`docs/adr/`](./docs/adr). Las reglas d
 
 Funcionalidades implementadas: películas populares con scroll infinito, búsqueda por título y detalle de película. En [Características](#características) se explica qué hace cada una y por qué se eligió cada librería.
 
-## Desarrollo guiado por especificaciones (SDD)
+## Desarrollo guiado por especificaciones (SDD) con Spec Kit
 
-Este proyecto usa **Spec-Driven Development (SDD)**: cada funcionalidad se define en una especificación antes de implementarse, y el código y las pruebas se derivan de ella. La herramienta es **Spec Kit**, instalada en este repositorio como comandos `/speckit-*` (en `.claude/skills/`) y con su configuración en `.specify/`.
+[**Spec Kit**](https://speckit.org/) es una herramienta de código abierto creada por GitHub para el **Spec-Driven Development (SDD)**: el desarrollo guiado por especificaciones. Según su sitio oficial, _"las especificaciones se vuelven ejecutables"_: en lugar de escribir código sin una definición previa, el equipo describe qué construir y por qué, y un agente de IA genera la implementación a partir de esa descripción. El objetivo es centrarse en los escenarios del producto y no en el código repetitivo.
 
-El flujo de una funcionalidad sigue estos comandos, en orden:
+Este proyecto usa Spec Kit con su flujo de comandos. Estos son los comandos de referencia de Spec Kit y los nombres con los que están instalados aquí (`/speckit-*`, en `.claude/skills/`):
 
-| Comando | Artefacto que produce | Qué define |
-| --- | --- | --- |
-| `/speckit-constitution` | `.specify/memory/constitution.md` | Principios y reglas globales del proyecto, que toda funcionalidad debe cumplir |
-| `/speckit-specify` | `specs/NNN-nombre/spec.md` | Historias de usuario priorizadas, requisitos funcionales y criterios de éxito, sin detalles de implementación |
-| `/speckit-clarify` | Actualiza `spec.md` | Resuelve las ambigüedades de la spec con preguntas acotadas |
-| `/speckit-plan` | `plan.md`, `research.md`, `data-model.md`, `contracts/`, `quickstart.md` | Diseño técnico, con la verificación de cumplimiento de la constitución |
-| `/speckit-tasks` | `tasks.md` | Lista ordenada de tareas, agrupadas por historia de usuario y con sus pruebas |
-| `/speckit-analyze` | Solo lectura | Revisa que spec, plan y tareas sean consistentes antes de implementar |
-| `/speckit-implement` | Código y pruebas | Ejecuta las tareas y marca cada una como completada |
+| Comando oficial | Comando en este proyecto | Qué hace                                                               | Cuándo se usa                                                                                  |
+| --------------- | ------------------------ | ---------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| `/constitution` | `/speckit-constitution`  | Crea los principios y las reglas de desarrollo del proyecto            | Primero, para establecer los estándares (`.specify/memory/constitution.md`)                    |
+| `/specify`      | `/speckit-specify`       | Define qué construir: requisitos e historias de usuario                | Enfocado en el _qué_ y el _por qué_, no en el stack (`specs/NNN-nombre/spec.md`)               |
+| `/clarify`      | `/speckit-clarify`       | Aclara las partes poco especificadas con preguntas estructuradas       | Debe ejecutarse antes de `/plan`, salvo que se omita explícitamente                            |
+| `/plan`         | `/speckit-plan`          | Crea el plan técnico con el stack elegido                              | Define arquitectura, frameworks y decisiones técnicas (`plan.md`, `research.md`, `contracts/`) |
+| `/tasks`        | `/speckit-tasks`         | Genera la lista de tareas accionables                                  | Divide el plan en pasos ejecutables (`tasks.md`)                                               |
+| `/analyze`      | `/speckit-analyze`       | Revisa la consistencia y la cobertura entre artefactos                 | Después de `/tasks` y antes de `/implement`. Solo lectura                                      |
+| `/implement`    | `/speckit-implement`     | Ejecuta todas las tareas para construir la funcionalidad según el plan | Genera el código funcional a partir de las especificaciones                                    |
 
 Las funcionalidades especificadas hasta ahora son: `001-popular-movies` (listado popular y estructura inicial del proyecto), `002-movie-search` (búsqueda), `003-movie-detail` (detalle de película) y `004-dev-error-simulation` (simulación de errores para desarrollo). Las decisiones de arquitectura se registran aparte como ADR en [`docs/adr/`](./docs/adr).
 
@@ -94,31 +94,31 @@ Las versiones son las fijadas en `package.json`.
 
 ### Núcleo
 
-| Área | Tecnología | Notas |
-| --- | --- | --- |
-| Framework | React Native 0.88 (CLI, flujo bare), React 19 | New Architecture y Hermes activados |
-| Lenguaje | TypeScript 6 (strict) | Alias de ruta `@/src/*` |
-| Gestor de paquetes | pnpm | `nodeLinker: hoisted` en `pnpm-workspace.yaml` (lo requiere React Native) |
-| Runtime | Node.js `^22.13.0`, `^24.3.0` o `>=26.0.0` | Ver [Requisitos previos](#requisitos-previos) |
-| Plataformas | Android e iOS | El mismo comportamiento en ambas |
+| Área               | Tecnología                                    | Notas                                                                     |
+| ------------------ | --------------------------------------------- | ------------------------------------------------------------------------- |
+| Framework          | React Native 0.88 (CLI, flujo bare), React 19 | New Architecture y Hermes activados                                       |
+| Lenguaje           | TypeScript 6 (strict)                         | Alias de ruta `@/src/*`                                                   |
+| Gestor de paquetes | pnpm                                          | `nodeLinker: hoisted` en `pnpm-workspace.yaml` (lo requiere React Native) |
+| Runtime            | Node.js `^22.13.0`, `^24.3.0` o `>=26.0.0`    | Ver [Requisitos previos](#requisitos-previos)                             |
+| Plataformas        | Android e iOS                                 | El mismo comportamiento en ambas                                          |
 
 ### Librerías de la app
 
-| Necesidad | Paquete | Cómo se usa |
-| --- | --- | --- |
-| Navegación | `@react-navigation/native` + `@react-navigation/native-stack` 7, `react-native-screens`, `react-native-safe-area-context` | Un solo stack nativo; nombres de ruta en `src/navigation/routes.ts` |
-| Estado del servidor | `@tanstack/react-query` 5 | Patrón keys → service → hook; `useInfiniteQuery` para la paginación de populares |
-| Estado global del cliente | `zustand` 5 | Stores pequeños en memoria: overlays de error de red y servidor, notificaciones toast y el término de búsqueda confirmado. Sin persistencia. Se eligió sobre Redux para evitar código repetitivo en una app pequeña (ADR-0004) |
-| HTTP | `axios` | Un solo `tmdbClient` (URL base y token Bearer desde `.env`, `language=es-PY` en cada petición, errores normalizados a `AppError`) |
-| Formularios | `react-hook-form` 7 + `@hookform/resolvers` 5 | El campo de búsqueda, validado con un esquema Zod a través de `zodResolver` |
-| Validación | `zod` 4 | Valida las variables de entorno al iniciar y el formulario de búsqueda |
-| Listas | `@shopify/flash-list` 2 | Cuadrícula de 2 columnas con reciclaje de celdas (ADR-0011), ver [Características](#1-lista-de-películas-populares) |
-| Skeleton | `react-native-reanimated` 4 (con `react-native-worklets`) + `react-native-linear-gradient` | Átomo `Skeleton` propio con brillo (ADR-0013, reemplaza la elección de Moti del ADR-0012) |
-| Conectividad | `@react-native-community/netinfo` | Detecta el estado sin conexión; al reconectar vuelve a pedir las consultas |
-| Entorno | `react-native-config` | Lee `.env` (`TMDB_BASE_URL`, `TMDB_ACCESS_TOKEN`) |
-| UI | Componentes propios con `StyleSheet.create` | Atomic Design + tokens de tema oscuro en `src/theme`; sin librería de UI (ADR-0007) |
-| Textos | Constantes en español (es-PY) en archivos `strings.ts` | Sin librería de internacionalización |
-| Depuración en desarrollo | `reactotron-react-native` | Solo en desarrollo; protegido con `__DEV__` |
+| Necesidad                 | Paquete                                                                                                                   | Cómo se usa                                                                                                                                                                                                                    |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Navegación                | `@react-navigation/native` + `@react-navigation/native-stack` 7, `react-native-screens`, `react-native-safe-area-context` | Un solo stack nativo; nombres de ruta en `src/navigation/routes.ts`                                                                                                                                                            |
+| Estado del servidor       | `@tanstack/react-query` 5                                                                                                 | Patrón keys → service → hook; `useInfiniteQuery` para la paginación de populares                                                                                                                                               |
+| Estado global del cliente | `zustand` 5                                                                                                               | Stores pequeños en memoria: overlays de error de red y servidor, notificaciones toast y el término de búsqueda confirmado. Sin persistencia. Se eligió sobre Redux para evitar código repetitivo en una app pequeña (ADR-0004) |
+| HTTP                      | `axios`                                                                                                                   | Un solo `tmdbClient` (URL base y token Bearer desde `.env`, `language=es-PY` en cada petición, errores normalizados a `AppError`)                                                                                              |
+| Formularios               | `react-hook-form` 7 + `@hookform/resolvers` 5                                                                             | El campo de búsqueda, validado con un esquema Zod a través de `zodResolver`                                                                                                                                                    |
+| Validación                | `zod` 4                                                                                                                   | Valida las variables de entorno al iniciar y el formulario de búsqueda                                                                                                                                                         |
+| Listas                    | `@shopify/flash-list` 2                                                                                                   | Cuadrícula de 2 columnas con reciclaje de celdas (ADR-0011), ver [Características](#1-lista-de-películas-populares)                                                                                                            |
+| Skeleton                  | `react-native-reanimated` 4 (con `react-native-worklets`) + `react-native-linear-gradient`                                | Átomo `Skeleton` propio con brillo (ADR-0013, reemplaza la elección de Moti del ADR-0012)                                                                                                                                      |
+| Conectividad              | `@react-native-community/netinfo`                                                                                         | Detecta el estado sin conexión; al reconectar vuelve a pedir las consultas                                                                                                                                                     |
+| Entorno                   | `react-native-config`                                                                                                     | Lee `.env` (`TMDB_BASE_URL`, `TMDB_ACCESS_TOKEN`)                                                                                                                                                                              |
+| UI                        | Componentes propios con `StyleSheet.create`                                                                               | Atomic Design + tokens de tema oscuro en `src/theme`; sin librería de UI (ADR-0007)                                                                                                                                            |
+| Textos                    | Constantes en español (es-PY) en archivos `strings.ts`                                                                    | Sin librería de internacionalización                                                                                                                                                                                           |
+| Depuración en desarrollo  | `reactotron-react-native`                                                                                                 | Solo en desarrollo; protegido con `__DEV__`                                                                                                                                                                                    |
 
 ### Datos y caché
 
@@ -132,15 +132,15 @@ Las versiones son las fijadas en `package.json`.
 
 ### Herramientas de calidad
 
-| Herramienta | Configuración |
-| --- | --- |
-| ESLint | Configuración `@react-native` + `eslint-plugin-perfectionist` (objetos, interfaces y props JSX ordenados), `react-native/no-inline-styles`, `react/prefer-read-only-props`, advertencia para `no-console`, imports de tipos consistentes, `reactotron/no-tron-in-production`. `pnpm lint:check` falla con cualquier advertencia |
-| Prettier | Comillas simples, comas finales, sin paréntesis en funciones de una sola flecha |
-| TypeScript | Strict, se verifica con `pnpm types` (`tsc --noEmit`) |
-| Jest | `@react-native/jest-preset` + `@testing-library/react-native`, cobertura v8, pruebas junto al código, `react-native-config` simulado |
-| Husky | `pre-commit`: `lint-staged` (ESLint `--fix` en JS/TS, Prettier en JSON/MD). `pre-push`: `commitlint` sobre los commits a subir, y después `pnpm pr:check` |
-| commitlint | `@commitlint/config-conventional` (encabezado máximo 150 caracteres, líneas del cuerpo máximo 100) |
-| Babel | `module-resolver` (alias `@/src`), `transform-remove-console` en builds de producción, transformación de Zod para exportaciones de espacio de nombres primero, plugin de worklets al final (Reanimated 4) |
+| Herramienta | Configuración                                                                                                                                                                                                                                                                                                                   |
+| ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| ESLint      | Configuración `@react-native` + `eslint-plugin-perfectionist` (objetos, interfaces y props JSX ordenados), `react-native/no-inline-styles`, `react/prefer-read-only-props`, advertencia para `no-console`, imports de tipos consistentes, `reactotron/no-tron-in-production`. `pnpm lint:check` falla con cualquier advertencia |
+| Prettier    | Comillas simples, comas finales, sin paréntesis en funciones de una sola flecha                                                                                                                                                                                                                                                 |
+| TypeScript  | Strict, se verifica con `pnpm types` (`tsc --noEmit`)                                                                                                                                                                                                                                                                           |
+| Jest        | `@react-native/jest-preset` + `@testing-library/react-native`, cobertura v8, pruebas junto al código, `react-native-config` simulado                                                                                                                                                                                            |
+| Husky       | `pre-commit`: `lint-staged` (ESLint `--fix` en JS/TS, Prettier en JSON/MD). `pre-push`: `commitlint` sobre los commits a subir, y después `pnpm pr:check`                                                                                                                                                                       |
+| commitlint  | `@commitlint/config-conventional` (encabezado máximo 150 caracteres, líneas del cuerpo máximo 100)                                                                                                                                                                                                                              |
+| Babel       | `module-resolver` (alias `@/src`), `transform-remove-console` en builds de producción, transformación de Zod para exportaciones de espacio de nombres primero, plugin de worklets al final (Reanimated 4)                                                                                                                       |
 
 ### Estructura del proyecto
 
@@ -166,23 +166,23 @@ Las versiones exactas que aparecen abajo son las que realmente exigen `react-nat
 
 Comunes a ambas plataformas:
 
-| Herramienta | Versión requerida | Cómo verificarla |
-| --- | --- | --- |
-| Node.js | `^22.13.0`, `^24.3.0` o `>=26.0.0` (ver nota abajo) | `node -v` |
-| pnpm | La última ([guía de instalación](https://pnpm.io/installation)) | `pnpm -v` |
-| Git | Cualquier versión reciente | `git --version` |
+| Herramienta | Versión requerida                                               | Cómo verificarla |
+| ----------- | --------------------------------------------------------------- | ---------------- |
+| Node.js     | `^22.13.0`, `^24.3.0` o `>=26.0.0` (ver nota abajo)             | `node -v`        |
+| pnpm        | La última ([guía de instalación](https://pnpm.io/installation)) | `pnpm -v`        |
+| Git         | Cualquier versión reciente                                      | `git --version`  |
 
 > **Nota sobre la versión de Node:** si `node -v` no cumple el rango de arriba, instala una versión compatible con [nvm](https://github.com/nvm-sh/nvm) o [Volta](https://volta.sh/) en lugar de cambiar el Node del sistema. `nvm install 22.13.0 && nvm use 22.13.0` (o cualquier versión de la misma línea mayor) basta para este proyecto.
 
 Android:
 
-| Herramienta | Versión requerida | Cómo verificarla |
-| --- | --- | --- |
-| JDK | 17 (necesario para ejecutar Gradle 9.4.1) | `java -version` |
-| Android Studio | La última estable (incluye el SDK de Android y un emulador) | — |
-| Plataforma del SDK de Android | API 37 (`compileSdk`); API 36 (`targetSdk`); API 24 mínimo (`minSdk`). Android Studio la instala con su SDK Manager la primera vez que abres el proyecto | — |
-| NDK de Android | Cualquier versión. Gradle descarga la predeterminada en el primer build si no hay ninguna instalada (o instálala con "NDK (Side by side)" desde el SDK Manager) | `ls $ANDROID_HOME/ndk` |
-| Gradle | 9.4.1 (lo descarga el wrapper de Gradle; no lo instales por separado) | — |
+| Herramienta                   | Versión requerida                                                                                                                                               | Cómo verificarla       |
+| ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------- |
+| JDK                           | 17 (necesario para ejecutar Gradle 9.4.1)                                                                                                                       | `java -version`        |
+| Android Studio                | La última estable (incluye el SDK de Android y un emulador)                                                                                                     | —                      |
+| Plataforma del SDK de Android | API 37 (`compileSdk`); API 36 (`targetSdk`); API 24 mínimo (`minSdk`). Android Studio la instala con su SDK Manager la primera vez que abres el proyecto        | —                      |
+| NDK de Android                | Cualquier versión. Gradle descarga la predeterminada en el primer build si no hay ninguna instalada (o instálala con "NDK (Side by side)" desde el SDK Manager) | `ls $ANDROID_HOME/ndk` |
+| Gradle                        | 9.4.1 (lo descarga el wrapper de Gradle; no lo instales por separado)                                                                                           | —                      |
 
 Define la variable de entorno `ANDROID_HOME` con la carpeta de tu SDK de Android, y agrega `platform-tools` y `emulator` a tu `PATH`. Estas son las rutas por defecto de Android Studio:
 
@@ -198,12 +198,12 @@ Abre una terminal nueva después de cambiarlas. `android/local.properties` depen
 
 iOS (solo macOS):
 
-| Herramienta | Versión requerida | Cómo verificarla |
-| --- | --- | --- |
-| Xcode | `16.1` o más reciente | `xcodebuild -version` |
-| Versión mínima de iOS | `15.1` (la fija el Podfile; los simuladores o dispositivos anteriores no son compatibles) | — |
-| CocoaPods | `1.13` o más reciente (no `1.15.0` ni `1.15.1`, que excluye el `Gemfile`) | `pod --version` |
-| Ruby | `2.6.10` o más reciente (ver `Gemfile`) | `ruby -v` |
+| Herramienta           | Versión requerida                                                                         | Cómo verificarla      |
+| --------------------- | ----------------------------------------------------------------------------------------- | --------------------- |
+| Xcode                 | `16.1` o más reciente                                                                     | `xcodebuild -version` |
+| Versión mínima de iOS | `15.1` (la fija el Podfile; los simuladores o dispositivos anteriores no son compatibles) | —                     |
+| CocoaPods             | `1.13` o más reciente (no `1.15.0` ni `1.15.1`, que excluye el `Gemfile`)                 | `pod --version`       |
+| Ruby                  | `2.6.10` o más reciente (ver `Gemfile`)                                                   | `ruby -v`             |
 
 Para la instalación inicial de Android Studio y Xcode, sigue la [guía oficial de React Native](https://reactnative.dev/docs/set-up-your-environment) (pestaña React Native CLI).
 
@@ -287,13 +287,13 @@ Esta sección explica cómo comprobar que la app se comporta bien cuando fallan 
 2. Abre el menú de desarrollo de React Native: **Cmd+D** en el simulador de iOS, **Cmd+M** en el emulador de Android, o sacude el dispositivo.
 3. Elige un item **"Simular: ..."**:
 
-| Modo | Qué pasa con cada petición a TMDB |
-| --- | --- |
-| **Simular: sin conexión** | Falla como error de red, sin código HTTP |
-| **Simular: servidor 500** | Responde HTTP 500 |
-| **Simular: 401** | Responde HTTP 401 (token inválido) |
+| Modo                              | Qué pasa con cada petición a TMDB                                                          |
+| --------------------------------- | ------------------------------------------------------------------------------------------ |
+| **Simular: sin conexión**         | Falla como error de red, sin código HTTP                                                   |
+| **Simular: servidor 500**         | Responde HTTP 500                                                                          |
+| **Simular: 401**                  | Responde HTTP 401 (token inválido)                                                         |
 | **Simular: fallar 3 y recuperar** | Las siguientes 3 peticiones fallan y después todas funcionan. Sirve para probar Reintentar |
-| **Simular: normal** | Vuelve a las peticiones reales |
+| **Simular: normal**               | Vuelve a las peticiones reales                                                             |
 
 El modo se aplica a la siguiente petición, sin recargar la app. Al recargar, la app vuelve a **normal**.
 
@@ -301,11 +301,11 @@ El modo se aplica a la siguiente petición, sin recargar la app. Al recargar, la
 
 Cuando una petición falla, la pantalla muestra su estado de error con el mensaje normal (por ejemplo, "No pudimos cargar las películas" o "No pudimos cargar la película") y un botón **Reintentar**. En desarrollo, debajo del mensaje aparece además una línea gris `[dev]` que indica el tipo de fallo:
 
-| Modo | Línea `[dev]` que debe aparecer |
-| --- | --- |
-| Sin conexión | `[dev] sin conexión` |
-| Servidor 500 | `[dev] HTTP 500` |
-| 401 | `[dev] HTTP 401` |
+| Modo         | Línea `[dev]` que debe aparecer |
+| ------------ | ------------------------------- |
+| Sin conexión | `[dev] sin conexión`            |
+| Servidor 500 | `[dev] HTTP 500`                |
+| 401          | `[dev] HTTP 401`                |
 
 La línea `[dev]` no aparece en producción.
 
@@ -321,14 +321,14 @@ Una vez agotados los tres fallos del modo "fallar 3", las siguientes peticiones 
 
 ### Resultados esperados
 
-| Prueba | Resultado |
-| --- | --- |
-| Sin conexión, primera carga del listado | Estado de error con `[dev] sin conexión`, y Reintentar funciona al volver al modo normal |
-| Servidor 500 al abrir un detalle nuevo | "No pudimos cargar la película" con `[dev] HTTP 500` |
-| 401 al buscar un término nuevo | Estado de error con `[dev] HTTP 401` |
-| Fallar 3 y recuperar | Tres errores seguidos con Reintentar, y después los datos |
-| Película inexistente (404) | "No encontramos esta película." con Volver, sin Reintentar. **El simulador no genera 404**: esta respuesta solo se prueba con las pruebas automáticas |
-| Error al cargar la página siguiente del listado | Aparece "No se pudieron cargar más películas" con Reintentar, sin línea `[dev]` |
+| Prueba                                          | Resultado                                                                                                                                             |
+| ----------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Sin conexión, primera carga del listado         | Estado de error con `[dev] sin conexión`, y Reintentar funciona al volver al modo normal                                                              |
+| Servidor 500 al abrir un detalle nuevo          | "No pudimos cargar la película" con `[dev] HTTP 500`                                                                                                  |
+| 401 al buscar un término nuevo                  | Estado de error con `[dev] HTTP 401`                                                                                                                  |
+| Fallar 3 y recuperar                            | Tres errores seguidos con Reintentar, y después los datos                                                                                             |
+| Película inexistente (404)                      | "No encontramos esta película." con Volver, sin Reintentar. **El simulador no genera 404**: esta respuesta solo se prueba con las pruebas automáticas |
+| Error al cargar la página siguiente del listado | Aparece "No se pudieron cargar más películas" con Reintentar, sin línea `[dev]`                                                                       |
 
 ### Límites de la simulación
 
@@ -350,19 +350,19 @@ pnpm test -- src/utils/describe-error            # etiquetas [dev]
 
 ## Scripts
 
-| Script | Descripción |
-| --- | --- |
-| `pnpm start` | Inicia el bundler Metro |
-| `pnpm android` | Compila y ejecuta en Android |
-| `pnpm ios` | Compila y ejecuta en iOS |
-| `pnpm test` | Ejecuta las pruebas con cobertura |
-| `pnpm test:watch` | Ejecuta las pruebas en modo observador |
-| `pnpm test:ci` | Pruebas con cobertura para CI (`--detectOpenHandles --forceExit`) |
-| `pnpm coverage` | Informe de cobertura |
-| `pnpm lint` | ESLint |
-| `pnpm lint:check` | ESLint (sin autocorrección, falla con advertencias) |
-| `pnpm types` | Verificación de TypeScript (`tsc --noEmit`) |
-| `pnpm pr:check` | `lint:check` + `types` + `test` (debe pasar antes de abrir un PR) |
+| Script            | Descripción                                                       |
+| ----------------- | ----------------------------------------------------------------- |
+| `pnpm start`      | Inicia el bundler Metro                                           |
+| `pnpm android`    | Compila y ejecuta en Android                                      |
+| `pnpm ios`        | Compila y ejecuta en iOS                                          |
+| `pnpm test`       | Ejecuta las pruebas con cobertura                                 |
+| `pnpm test:watch` | Ejecuta las pruebas en modo observador                            |
+| `pnpm test:ci`    | Pruebas con cobertura para CI (`--detectOpenHandles --forceExit`) |
+| `pnpm coverage`   | Informe de cobertura                                              |
+| `pnpm lint`       | ESLint                                                            |
+| `pnpm lint:check` | ESLint (sin autocorrección, falla con advertencias)               |
+| `pnpm types`      | Verificación de TypeScript (`tsc --noEmit`)                       |
+| `pnpm pr:check`   | `lint:check` + `types` + `test` (debe pasar antes de abrir un PR) |
 
 ## Solución de problemas
 
