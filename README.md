@@ -6,6 +6,24 @@ Las decisiones de arquitectura están en [`docs/adr/`](./docs/adr). Las reglas d
 
 Funcionalidades implementadas: películas populares con scroll infinito, búsqueda por título y detalle de película. En [Características](#características) se explica qué hace cada una y por qué se eligió cada librería.
 
+## Desarrollo guiado por especificaciones (SDD)
+
+Este proyecto usa **Spec-Driven Development (SDD)**: cada funcionalidad se define en una especificación antes de implementarse, y el código y las pruebas se derivan de ella. La herramienta es **Spec Kit**, instalada en este repositorio como comandos `/speckit-*` (en `.claude/skills/`) y con su configuración en `.specify/`.
+
+El flujo de una funcionalidad sigue estos comandos, en orden:
+
+| Comando | Artefacto que produce | Qué define |
+| --- | --- | --- |
+| `/speckit-constitution` | `.specify/memory/constitution.md` | Principios y reglas globales del proyecto, que toda funcionalidad debe cumplir |
+| `/speckit-specify` | `specs/NNN-nombre/spec.md` | Historias de usuario priorizadas, requisitos funcionales y criterios de éxito, sin detalles de implementación |
+| `/speckit-clarify` | Actualiza `spec.md` | Resuelve las ambigüedades de la spec con preguntas acotadas |
+| `/speckit-plan` | `plan.md`, `research.md`, `data-model.md`, `contracts/`, `quickstart.md` | Diseño técnico, con la verificación de cumplimiento de la constitución |
+| `/speckit-tasks` | `tasks.md` | Lista ordenada de tareas, agrupadas por historia de usuario y con sus pruebas |
+| `/speckit-analyze` | Solo lectura | Revisa que spec, plan y tareas sean consistentes antes de implementar |
+| `/speckit-implement` | Código y pruebas | Ejecuta las tareas y marca cada una como completada |
+
+Las funcionalidades especificadas hasta ahora son: `001-popular-movies` (listado popular y estructura inicial del proyecto), `002-movie-search` (búsqueda), `003-movie-detail` (detalle de película) y `004-dev-error-simulation` (simulación de errores para desarrollo). Las decisiones de arquitectura se registran aparte como ADR en [`docs/adr/`](./docs/adr).
+
 ## Características
 
 ### 1. Lista de películas populares
@@ -139,12 +157,8 @@ src/
 ├── utils/         # Utilidades puras
 └── assets/        # Recursos estáticos
 docs/adr/          # Registros de decisiones de arquitectura (ADR)
-specs/             # Specs, planes y tareas de Spec Kit
+specs/             # Especificaciones, planes y tareas de Spec Kit (ver Desarrollo guiado por especificaciones)
 ```
-
-### Flujo guiado por especificaciones
-
-Las funcionalidades se especifican con [Spec Kit](https://github.com/github/spec-kit): `.specify/memory/constitution.md` contiene las reglas globales y cada funcionalidad vive en `specs/NNN-nombre/` (`spec.md`, `plan.md`, `research.md`, `data-model.md`, `contracts/`, `quickstart.md`, `tasks.md`).
 
 ## Requisitos previos
 
