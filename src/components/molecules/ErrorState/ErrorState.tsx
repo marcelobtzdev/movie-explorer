@@ -6,12 +6,14 @@ import { StyleSheet, View } from 'react-native';
 import React from 'react';
 
 export interface ErrorStateProps {
+  // Shown only in development builds, to tell the kind of failure apart while testing.
+  readonly debugDetail?: string;
   readonly message: string;
   readonly onRetry: () => void;
   readonly title: string;
 }
 
-export function ErrorState({ message, onRetry, title }: ErrorStateProps) {
+export function ErrorState({ debugDetail, message, onRetry, title }: ErrorStateProps) {
   return (
     <View style={styles.container}>
       <Text align="center" size="lg" weight="bold">
@@ -20,6 +22,11 @@ export function ErrorState({ message, onRetry, title }: ErrorStateProps) {
       <Text align="center" color="secondary" size="sm">
         {message}
       </Text>
+      {__DEV__ && debugDetail ? (
+        <Text align="center" color="secondary" size="xs">
+          {`[dev] ${debugDetail}`}
+        </Text>
+      ) : null}
       <Button label={APP_STRINGS.retryAction} onPress={onRetry} />
     </View>
   );

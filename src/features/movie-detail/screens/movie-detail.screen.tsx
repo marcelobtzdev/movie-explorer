@@ -11,6 +11,7 @@ import { Header } from '@/src/components/organisms/Header';
 import { ScreenContainer } from '@/src/components/templates/ScreenContainer';
 import { designSystem } from '@/src/theme';
 import { AppError } from '@/src/utils/app-error';
+import { describeErrorForDev } from '@/src/utils/describe-error.utils';
 import { LinearGradient } from '@/src/vendors/linear-gradient';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
@@ -55,6 +56,7 @@ export function MovieDetailScreen() {
     content = (
       <View style={styles.centered}>
         <ErrorState
+          debugDetail={describeErrorForDev(detailQuery.error)}
           message={MOVIE_DETAIL_STRINGS.errorMessage}
           onRetry={handleRetry}
           title={MOVIE_DETAIL_STRINGS.errorTitle}

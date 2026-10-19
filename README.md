@@ -1,308 +1,361 @@
 # MovieExplorer
 
-Mobile app (React Native CLI + TypeScript) that consumes the [TMDB API](https://developer.themoviedb.org/docs/getting-started) to browse popular movies, search by title and see movie details. Runs on Android and iOS.
+App móvil (React Native CLI + TypeScript) que consume la [API de TMDB](https://developer.themoviedb.org/docs/getting-started) para explorar las películas populares, buscar por título y ver el detalle de cada película. Funciona en Android e iOS.
 
-Architecture decisions are documented in [`docs/adr/`](./docs/adr). Project rules live in [`.specify/memory/constitution.md`](./.specify/memory/constitution.md).
+Las decisiones de arquitectura están en [`docs/adr/`](./docs/adr). Las reglas del proyecto están en [`.specify/memory/constitution.md`](./.specify/memory/constitution.md).
 
-Implemented features: popular movies with infinite scroll, search by title, and movie detail. See [Features](#features) for what each one does and why each library was chosen.
+Funcionalidades implementadas: películas populares con scroll infinito, búsqueda por título y detalle de película. En [Características](#características) se explica qué hace cada una y por qué se eligió cada librería.
 
-## Features
+## Características
 
-### 1. Popular movies list
+### 1. Lista de películas populares
 
-- The main screen shows TMDB's most popular movies in a **two-column grid** with a **featured card** for the first movie (wide backdrop, rating, genre names and release year). The rest of the movies go into the grid, and the first movie never appears twice.
-- The genre catalog is loaded **before** the list (`GET /genre/movie/list`) so each card can show genre names instead of ids. The lookup is built once per response and passed down as props.
-- **Why FlashList:** `@shopify/flash-list` recycles cells instead of keeping one view per item, so a long grid stays smooth on low-end devices. `drawDistance` (250) renders only the items close to the viewport, `numColumns` produces the grid, and the list header (tabs, featured card, section title) scrolls with the content.
-- **Why memoized cards:** `MovieCard` is wrapped in `React.memo` and receives stable callbacks, so recycled cells do not re-render unless their movie changes.
+- La pantalla principal muestra las películas más populares de TMDB en una **cuadrícula de dos columnas**, con una **tarjeta destacada** para la primera película (backdrop ancho, valoración, géneros y año de estreno). El resto va en la cuadrícula, y la primera película nunca aparece dos veces.
+- El catálogo de géneros se carga **antes** que la lista (`GET /genre/movie/list`), para que cada tarjeta muestre nombres de género en lugar de ids. El diccionario se construye una vez por respuesta y se pasa como props.
+- **Por qué FlashList:** `@shopify/flash-list` recicla celdas en lugar de mantener una vista por elemento, así que una cuadrícula larga se mantiene fluida incluso en equipos modestos. `drawDistance` (250) renderiza solo los elementos cercanos a la pantalla, `numColumns` genera la cuadrícula, y el encabezado de la lista (pestañas, tarjeta destacada y título de sección) se desplaza con el contenido.
+- **Por qué tarjetas memorizadas:** `MovieCard` está envuelta en `React.memo` y recibe callbacks estables, así que las celdas recicladas no se vuelven a renderizar salvo que cambie su película.
 
-### 2. Infinite scroll (pagination)
+### 2. Scroll infinito (paginación)
 
-- Next pages load when the user is within half a screen of the end (`onEndReachedThreshold` 0.5), with no button.
-- A new page is requested only when no page is loading, and never after an error (the footer shows a retry action instead). A repeated scroll to the end does not trigger a second request.
-- TMDB caps pagination at 500 pages, so `getNextPageParam` stops at `min(total_pages, 500)`.
-- Movies that appear on more than one page (TMDB pages can overlap) are de-duplicated by id in the query's `select`, not during render.
-- **Why `useInfiniteQuery`:** TanStack Query keeps every loaded page in the cache, so returning to the list does not reload the pages already seen.
+- La siguiente página se carga cuando el usuario está a media pantalla del final (`onEndReachedThreshold` 0.5), sin botón.
+- Una página nueva se pide solo si no hay otra cargando y nunca después de un error (el pie de la lista muestra entonces un botón de reintentar). Un scroll repetido hasta el final no dispara una segunda petición.
+- TMDB limita la paginación a 500 páginas, así que `getNextPageParam` se detiene en `min(total_pages, 500)`.
+- Las películas que aparecen en más de una página (las páginas de TMDB pueden solaparse) se eliminan por id en el `select` de la consulta, no durante el render.
+- **Por qué `useInfiniteQuery`:** TanStack Query conserva todas las páginas cargadas en la caché, así que volver a la lista no vuelve a pedir las páginas ya vistas.
 
-### 3. Search by title
+### 3. Búsqueda por título
 
-- A search field sits above the category tabs. The typed text is **debounced 300 ms**; only then the trimmed term is committed, so a request is sent per pause and not per keystroke.
-- Clearing the field (deleting the text or the clear action) returns to the popular list immediately, and the popular data comes from the cache.
-- Results use the same layout as the popular list. Results of a previous term stay visible while the new term loads (`keepPreviousData`), so the screen does not flash empty.
-- Search shows the **first page** of results only (TMDB returns up to 20 movies per page). Showing more would need the `page` parameter and infinite scrolling; see the spec for the decision.
-- **Why React Hook Form + Zod:** the field is the app's only form. React Hook Form keeps its state outside React's render cycle, and Zod validates the trimmed value (maximum 100 characters) through `zodResolver`.
-- **Why Zustand for one string:** the committed term is shared by the search hook and the screen, and it is read outside React when needed. Server results are never copied into Zustand; they stay in TanStack Query under the key `moviesKeys.search(term)`.
+- El campo de búsqueda está encima de las pestañas. El texto escrito tiene un **debounce de 300 ms**: solo entonces se confirma el término recortado, así que se envía una petición por pausa y no por cada tecla.
+- Borrar el campo (borrando el texto o con la acción de limpiar) vuelve de inmediato al listado popular, y sus datos salen de la caché.
+- Los resultados usan el mismo diseño que el listado. Los resultados del término anterior se mantienen visibles mientras carga el nuevo (`keepPreviousData`), así que la pantalla no parpadea vacía.
+- La búsqueda muestra solo la **primera página** de resultados (TMDB devuelve hasta 20 películas por página). Mostrar más requeriría el parámetro `page` y scroll infinito; la decisión está en la spec.
+- **Por qué React Hook Form + Zod:** el campo es el único formulario de la app. React Hook Form mantiene su estado fuera del ciclo de render de React, y Zod valida el valor recortado (máximo 100 caracteres) a través de `zodResolver`.
+- **Por qué Zustand para una sola cadena:** el término confirmado lo comparten el hook de búsqueda y la pantalla, y se lee fuera de React cuando hace falta. Los resultados del servidor nunca se copian a Zustand; viven en TanStack Query bajo la clave `moviesKeys.search(term)`.
 
-### 4. Movie detail
+### 4. Detalle de película
 
-- Tapping a grid card, the featured card or a search result opens the detail screen (native stack navigation, typed params: `{ movieId }` only).
-- The detail loads `GET /movie/{movieId}` and shows the backdrop image, title, release date in Spanish long form ("1 de marzo de 2024"), genre chips and the synopsis.
-- **Prefetch on tap:** before navigating, the app prefetches the detail image with `Image.prefetch`, so the picture is usually ready when the screen opens. A failed prefetch is ignored.
-- **Caching:** the detail query has a 10-minute `staleTime`, so opening the same movie again does not wait for the network.
-- States: a skeleton with the final layout while loading; an error with "Reintentar" that repeats only the detail request; a "not found" message for a `404`, without a retry button.
+- Tocar una tarjeta de la cuadrícula, la tarjeta destacada o un resultado de búsqueda abre la pantalla de detalle (navegación nativa por stack, con parámetros tipados: solo `{ movieId }`).
+- El detalle carga `GET /movie/{movieId}` y muestra la imagen de fondo, el título, la fecha de estreno en formato largo en español ("1 de marzo de 2024"), los chips de géneros y la sinopsis.
+- **Prefetch al tocar:** antes de navegar, la app precarga la imagen del detalle con `Image.prefetch`, así que suele estar lista cuando se abre la pantalla. Si la precarga falla, se ignora.
+- **Caché:** la consulta del detalle tiene un `staleTime` de 10 minutos, así que volver a abrir la misma película no espera a la red.
+- Estados: un skeleton con el diseño final mientras carga; un error con "Reintentar" que repite solo la petición del detalle; un mensaje de "no encontrada" para un `404`, sin botón de reintentar.
 
-### 5. Loading, error, empty and offline states
+### 5. Estados de carga, error, vacío y sin conexión
 
-- **Skeleton** (`Skeleton` atom): a shimmer placeholder with the same layout as the content, so the page does not jump when data arrives. Blocks inside one `Skeleton.Group` animate in sync. The shimmer is a `react-native-reanimated` animation running on the UI thread through `react-native-worklets`, so it does not compete with JavaScript work.
-- **Inline states:** the list and the detail render their own error, empty and not-found states with retry or back actions. The header, tabs and bottom menu stay visible.
-- **Global overlays:** network and server failures in other requests show a full-screen overlay with a retry action, driven by Zustand stores. Screens that handle their own errors opt out with `meta: { skipNetworkError, skipServerError }`, so the same error is not shown twice.
-- **Offline:** `@react-native-community/netinfo` detects connection changes. Content already on screen stays visible; when the connection returns, the app shows a toast and refetches the queries.
+- **Skeleton** (átomo `Skeleton`): un placeholder con brillo que tiene el mismo diseño que el contenido, así la página no salta cuando llegan los datos. Los bloques dentro de un mismo `Skeleton.Group` se animan sincronizados. El brillo es una animación de `react-native-reanimated` que corre en el hilo de UI a través de `react-native-worklets`, así que no compite con el trabajo de JavaScript.
+- **Estados inline:** el listado y el detalle muestran sus propios estados de error, vacío y no encontrado, con acciones de reintentar o volver. El encabezado, las pestañas y el menú inferior siguen visibles.
+- **Overlays globales:** los fallos de red y de servidor de las consultas que no manejan su propio error muestran un overlay a pantalla completa con reintentar, controlado por stores de Zustand. Las pantallas que manejan sus propios errores se excluyen con `meta: { skipNetworkError, skipServerError }`, para no mostrar el mismo error dos veces.
+- **Sin conexión:** `@react-native-community/netinfo` detecta los cambios de conexión. El contenido que ya está en pantalla se mantiene; cuando vuelve la conexión, la app muestra un toast y vuelve a pedir las consultas activas.
 
-### 6. Images
+### 6. Imágenes
 
-- TMDB serves each image in several sizes, and the app requests the size each place needs: grid posters `w342`, featured backdrop `w780`, detail backdrop `w1280`. Smaller sizes mean less data and less memory.
-- The `Poster` atom is the only component that renders images. It sets explicit dimensions, uses `resizeMode="cover"`, shows a placeholder when there is no path, and falls back to the same placeholder when the image fails to load.
-- On Android the image uses `resizeMethod="resize"`, so it is decoded at the displayed size instead of its full resolution.
-- Image URLs are built by `buildTmdbImageUrl` from the constant `https://image.tmdb.org/t/p/` and the size constants in `src/constants/tmdb.ts`. The app does not call TMDB's `/configuration` endpoint.
+- TMDB sirve cada imagen en varios tamaños, y la app pide el tamaño que necesita cada lugar: pósteres de la cuadrícula `w342`, backdrop de la tarjeta destacada `w780`, backdrop del detalle `w1280`. Tamaños más pequeños significan menos datos y menos memoria.
+- El átomo `Poster` es el único componente que renderiza imágenes. Define dimensiones explícitas, usa `resizeMode="cover"`, muestra un placeholder cuando no hay ruta y cae en el mismo placeholder si la imagen no carga.
+- En Android la imagen usa `resizeMethod="resize"`, así que se decodifica al tamaño mostrado y no a su resolución completa.
+- Las URLs de imagen se construyen con `buildTmdbImageUrl` a partir de la constante `https://image.tmdb.org/t/p/` y de los tamaños de `src/constants/tmdb.ts`. La app no llama al endpoint `/configuration` de TMDB.
 
-### 7. Accessibility and layout
+### 7. Accesibilidad y diseño
 
-- Every interactive element has an `accessibilityRole` and label; touch targets are at least 44x44 pt (small visual elements use a `hitSlop` to reach that size).
-- The screen respects the safe areas (the bottom menu owns the bottom inset) and supports system font scaling.
-- The search field keeps the keyboard open for taps on results and dismisses it when the user scrolls the results.
+- Cada elemento interactivo tiene `accessibilityRole` y etiqueta; las áreas de toque miden al menos 44x44 pt (los elementos visuales pequeños usan `hitSlop` para alcanzar ese tamaño).
+- La pantalla respeta las áreas seguras (el menú inferior controla el margen inferior) y admite el tamaño de fuente del sistema.
+- El campo de búsqueda mantiene el teclado abierto cuando se toca un resultado, y lo cierra cuando el usuario hace scroll en los resultados.
 
-### 8. Configuration and quality
+### 8. Configuración y calidad
 
-- **Environment:** `.env` is read by `react-native-config` and validated with Zod at startup, so a missing or malformed `TMDB_BASE_URL` or `TMDB_ACCESS_TOKEN` fails with a clear message instead of a request error later.
-- **Production build:** `babel-plugin-transform-remove-console` removes `console.*` calls. Reactotron is loaded only in development.
-- **Tests:** each feature has colocated unit, hook, component and screen tests with Jest and React Native Testing Library. `pnpm pr:check` runs lint, types and tests.
+- **Entorno:** `react-native-config` lee `.env` y Zod lo valida al iniciar. Si falta `TMDB_BASE_URL` o `TMDB_ACCESS_TOKEN`, o tienen un formato incorrecto, la app muestra un error claro en lugar de fallar más tarde en una petición.
+- **Build de producción:** `babel-plugin-transform-remove-console` elimina las llamadas `console.*`. Reactotron solo se carga en desarrollo (`if (__DEV__)` en `index.js`).
+- **Pruebas:** cada feature tiene pruebas unitarias, de hooks, de componentes y de pantalla, colocadas junto al código, con Jest y React Native Testing Library. `pnpm pr:check` ejecuta lint, tipos y pruebas.
 
-## Tech stack
+### 9. Simulación de errores (solo desarrollo)
 
-Versions are the ones pinned in `package.json`.
+Permite ver cómo se comportan el listado, la búsqueda y el detalle cuando fallan las peticiones, sin cambiar el token ni reconstruir la app. Se explica con detalle en [Probar el manejo de errores](#probar-el-manejo-de-errores).
 
-### Core
+## Stack tecnológico
 
-| Area | Technology | Notes |
+Las versiones son las fijadas en `package.json`.
+
+### Núcleo
+
+| Área | Tecnología | Notas |
 | --- | --- | --- |
-| Framework | React Native 0.88 (CLI, bare workflow), React 19 | New Architecture and Hermes enabled |
-| Language | TypeScript 6 (strict) | Path alias `@/src/*` |
-| Package manager | pnpm | `nodeLinker: hoisted` in `pnpm-workspace.yaml` (required by React Native) |
-| Runtime | Node.js `^22.13.0`, `^24.3.0`, or `>=26.0.0` | See [Prerequisites](#prerequisites) |
-| Platforms | Android and iOS | Same behavior on both |
+| Framework | React Native 0.88 (CLI, flujo bare), React 19 | New Architecture y Hermes activados |
+| Lenguaje | TypeScript 6 (strict) | Alias de ruta `@/src/*` |
+| Gestor de paquetes | pnpm | `nodeLinker: hoisted` en `pnpm-workspace.yaml` (lo requiere React Native) |
+| Runtime | Node.js `^22.13.0`, `^24.3.0` o `>=26.0.0` | Ver [Requisitos previos](#requisitos-previos) |
+| Plataformas | Android e iOS | El mismo comportamiento en ambas |
 
-### App libraries
+### Librerías de la app
 
-| Need | Package | How it is used |
+| Necesidad | Paquete | Cómo se usa |
 | --- | --- | --- |
-| Navigation | `@react-navigation/native` + `@react-navigation/native-stack` 7, `react-native-screens`, `react-native-safe-area-context` | Single native stack; route names in `src/navigation/routes.ts` |
-| Server state | `@tanstack/react-query` 5 | Keys → service → hook pattern; `useInfiniteQuery` for the popular movies pagination |
-| Global client state | `zustand` 5 | Small in-memory stores: network/server error overlays, toast notifications, and the committed search term. No persistence. Chosen over Redux to avoid boilerplate in a small app (ADR-0004) |
-| HTTP | `axios` | Single `tmdbClient` (base URL and Bearer token from env, `language=es-PY` on every request, errors normalized to `AppError`) |
-| Forms | `react-hook-form` 7 + `@hookform/resolvers` 5 | The search field, validated with a Zod schema through `zodResolver` |
-| Validation | `zod` 4 | Validates environment variables at startup and the search form |
-| Lists | `@shopify/flash-list` 2 | 2-column grid with cell recycling (ADR-0011), see [Features](#1-popular-movies-list) |
-| Skeleton | `react-native-reanimated` 4 (with `react-native-worklets`) + `react-native-linear-gradient` | Project-owned shimmer `Skeleton` atom (ADR-0013, supersedes the Moti choice of ADR-0012) |
-| Connectivity | `@react-native-community/netinfo` | Detects offline state; reconnection refetches queries |
-| Environment | `react-native-config` | Reads `.env` (`TMDB_BASE_URL`, `TMDB_ACCESS_TOKEN`) |
-| UI | Custom components with `StyleSheet.create` | Atomic Design + dark theme tokens in `src/theme`; no UI library (ADR-0007) |
-| Texts | Spanish (es-PY) constants in `strings.ts` files | No internationalization library |
-| Dev debugging | `reactotron-react-native` | Dev only; guarded by `__DEV__` |
+| Navegación | `@react-navigation/native` + `@react-navigation/native-stack` 7, `react-native-screens`, `react-native-safe-area-context` | Un solo stack nativo; nombres de ruta en `src/navigation/routes.ts` |
+| Estado del servidor | `@tanstack/react-query` 5 | Patrón keys → service → hook; `useInfiniteQuery` para la paginación de populares |
+| Estado global del cliente | `zustand` 5 | Stores pequeños en memoria: overlays de error de red y servidor, notificaciones toast y el término de búsqueda confirmado. Sin persistencia. Se eligió sobre Redux para evitar código repetitivo en una app pequeña (ADR-0004) |
+| HTTP | `axios` | Un solo `tmdbClient` (URL base y token Bearer desde `.env`, `language=es-PY` en cada petición, errores normalizados a `AppError`) |
+| Formularios | `react-hook-form` 7 + `@hookform/resolvers` 5 | El campo de búsqueda, validado con un esquema Zod a través de `zodResolver` |
+| Validación | `zod` 4 | Valida las variables de entorno al iniciar y el formulario de búsqueda |
+| Listas | `@shopify/flash-list` 2 | Cuadrícula de 2 columnas con reciclaje de celdas (ADR-0011), ver [Características](#1-lista-de-películas-populares) |
+| Skeleton | `react-native-reanimated` 4 (con `react-native-worklets`) + `react-native-linear-gradient` | Átomo `Skeleton` propio con brillo (ADR-0013, reemplaza la elección de Moti del ADR-0012) |
+| Conectividad | `@react-native-community/netinfo` | Detecta el estado sin conexión; al reconectar vuelve a pedir las consultas |
+| Entorno | `react-native-config` | Lee `.env` (`TMDB_BASE_URL`, `TMDB_ACCESS_TOKEN`) |
+| UI | Componentes propios con `StyleSheet.create` | Atomic Design + tokens de tema oscuro en `src/theme`; sin librería de UI (ADR-0007) |
+| Textos | Constantes en español (es-PY) en archivos `strings.ts` | Sin librería de internacionalización |
+| Depuración en desarrollo | `reactotron-react-native` | Solo en desarrollo; protegido con `__DEV__` |
 
-### Data and caching
+### Datos y caché
 
-- **API:** TMDB v3 (`GET /movie/popular`, `GET /genre/movie/list`, `GET /search/movie`, `GET /movie/{movieId}`), language `es-PY` on every request.
-- **Genres first:** the genre catalog is fetched once before the movie list (it gates the list query) and resolved by id to names.
-- **Query cache:** popular list and search `staleTime` 5 min; movie detail `staleTime` 10 min; `gcTime` 30 min; genres `staleTime` and `gcTime` 24 h; automatic retries disabled (each manual "Reintentar" press makes exactly one request).
-- **Request cancellation:** services receive the TanStack Query `AbortSignal` and pass it to Axios.
-- **Pagination:** infinite scroll (threshold 0.5, no duplicate concurrent loads), capped at `min(total_pages, 500)` (TMDB limit), de-duplicated by movie id.
-- **Global error handling:** the `QueryClient` routes network and server errors to the Zustand overlay stores; screens opt out per query with `meta: { skipNetworkError, skipServerError, skipNotify }` when they show their own inline error state.
-- **Images:** TMDB sizes by use (`w342` grid posters, `w780` featured backdrop, `w1280` detail backdrop), explicit dimensions, placeholder and fallback, Android `resizeMethod="resize"`. Details in [Features](#6-images).
+- **API:** TMDB v3 (`GET /movie/popular`, `GET /genre/movie/list`, `GET /search/movie`, `GET /movie/{movieId}`), idioma `es-PY` en cada petición.
+- **Géneros primero:** el catálogo de géneros se pide una vez antes que la lista (condiciona la consulta de la lista) y se resuelve por id a nombres.
+- **Caché de consultas:** listado popular y búsqueda con `staleTime` de 5 min; detalle con `staleTime` de 10 min; `gcTime` de 30 min; géneros con `staleTime` y `gcTime` de 24 h; reintentos automáticos desactivados (cada "Reintentar" manual hace exactamente una petición).
+- **Cancelación de peticiones:** los servicios reciben el `AbortSignal` de TanStack Query y lo pasan a Axios.
+- **Paginación:** scroll infinito (umbral 0.5, sin cargas concurrentes duplicadas), limitada a `min(total_pages, 500)` (límite de TMDB) y sin duplicados por id.
+- **Manejo global de errores:** el `QueryClient` envía los errores de red y de servidor a los stores de overlay de Zustand. Las consultas cuyas pantallas muestran su propio estado de error pasan `meta: { skipNetworkError, skipServerError, skipNotify }`.
+- **Imágenes:** tamaños de TMDB según el uso (`w342` pósteres de la cuadrícula, `w780` backdrop destacado, `w1280` backdrop del detalle), dimensiones explícitas, placeholder y fallback, `resizeMethod="resize"` en Android. Detalles en [Características](#6-imágenes).
 
-### Quality tooling
+### Herramientas de calidad
 
-| Tool | Setup |
+| Herramienta | Configuración |
 | --- | --- |
-| ESLint | `@react-native` config + `eslint-plugin-perfectionist` (sorted objects, interfaces, JSX props), `react-native/no-inline-styles`, `react/prefer-read-only-props`, `no-console` warning, consistent type imports, `reactotron/no-tron-in-production`. `pnpm lint:check` fails on any warning |
-| Prettier | Single quotes, trailing commas, arrow parens avoided |
-| TypeScript | Strict, checked with `pnpm types` (`tsc --noEmit`) |
-| Jest | `@react-native/jest-preset` + `@testing-library/react-native`, v8 coverage, tests colocated with the code, `react-native-config` mocked |
-| Husky | `pre-commit`: `lint-staged` (ESLint `--fix` on staged JS/TS, Prettier on staged JSON/MD). `pre-push`: `commitlint` over the commits being pushed, then `pnpm pr:check` |
-| commitlint | `@commitlint/config-conventional` (header max 150 chars, body lines max 100) |
-| Babel | `module-resolver` (`@/src` alias), `transform-remove-console` in production builds, Zod export-namespace transform first, worklets plugin last (Reanimated 4) |
+| ESLint | Configuración `@react-native` + `eslint-plugin-perfectionist` (objetos, interfaces y props JSX ordenados), `react-native/no-inline-styles`, `react/prefer-read-only-props`, advertencia para `no-console`, imports de tipos consistentes, `reactotron/no-tron-in-production`. `pnpm lint:check` falla con cualquier advertencia |
+| Prettier | Comillas simples, comas finales, sin paréntesis en funciones de una sola flecha |
+| TypeScript | Strict, se verifica con `pnpm types` (`tsc --noEmit`) |
+| Jest | `@react-native/jest-preset` + `@testing-library/react-native`, cobertura v8, pruebas junto al código, `react-native-config` simulado |
+| Husky | `pre-commit`: `lint-staged` (ESLint `--fix` en JS/TS, Prettier en JSON/MD). `pre-push`: `commitlint` sobre los commits a subir, y después `pnpm pr:check` |
+| commitlint | `@commitlint/config-conventional` (encabezado máximo 150 caracteres, líneas del cuerpo máximo 100) |
+| Babel | `module-resolver` (alias `@/src`), `transform-remove-console` en builds de producción, transformación de Zod para exportaciones de espacio de nombres primero, plugin de worklets al final (Reanimated 4) |
 
-### Project structure
+### Estructura del proyecto
 
 ```
 src/
-├── features/      # Feature slices (movies, genres, movie-detail), each with its own api, hooks, components, screens
-├── components/    # Shared UI (Atomic Design: atoms, molecules, organisms, templates)
-├── stores/        # Global Zustand stores
-├── vendors/       # Third-party wrappers (axios, react-query, react-navigation, netinfo, linear-gradient, reactotron)
-├── navigation/    # Root stack, route constants, navigation types
-├── hooks/         # Shared hooks
-├── theme/         # Design tokens (colors, spacing, typography)
-├── constants/     # env, TMDB, query cache, list tuning, texts
-├── utils/         # Pure utilities
-└── assets/        # Static assets
-docs/adr/          # Architecture Decision Records
-specs/             # Spec Kit feature specs, plans and tasks
+├── features/      # Slices por funcionalidad (movies, genres, movie-detail), cada uno con su api, hooks, componentes y pantallas
+├── components/    # UI compartida (Atomic Design: atoms, molecules, organisms, templates)
+├── stores/        # Stores globales de Zustand
+├── vendors/       # Envoltorios de librerías externas (axios, react-query, react-navigation, netinfo, linear-gradient, reactotron, dev-error-simulator)
+├── navigation/    # Stack raíz, constantes de rutas y tipos de navegación
+├── hooks/         # Hooks compartidos
+├── theme/         # Tokens de diseño (colores, espaciado, tipografía)
+├── constants/     # Entorno, TMDB, caché de consultas, ajustes de listas, textos
+├── utils/         # Utilidades puras
+└── assets/        # Recursos estáticos
+docs/adr/          # Registros de decisiones de arquitectura (ADR)
+specs/             # Specs, planes y tareas de Spec Kit
 ```
 
-### Spec-driven workflow
+### Flujo guiado por especificaciones
 
-Features are specified with [Spec Kit](https://github.com/github/spec-kit): `.specify/memory/constitution.md` holds the global rules and each feature lives in `specs/NNN-name/` (`spec.md`, `plan.md`, `research.md`, `data-model.md`, `contracts/`, `quickstart.md`, `tasks.md`).
+Las funcionalidades se especifican con [Spec Kit](https://github.com/github/spec-kit): `.specify/memory/constitution.md` contiene las reglas globales y cada funcionalidad vive en `specs/NNN-nombre/` (`spec.md`, `plan.md`, `research.md`, `data-model.md`, `contracts/`, `quickstart.md`, `tasks.md`).
 
-## Prerequisites
+## Requisitos previos
 
-Exact versions below are what `react-native@0.88` and this project's native projects actually
-require (checked against `node_modules/react-native/package.json`'s `engines` field,
-`android/build.gradle`, `android/gradle/wrapper/gradle-wrapper.properties` and
-`node_modules/react-native/scripts/cocoapods/helpers.rb`) — not rounded guesses. Run `node -v`,
-`java -version`, `pod --version` etc. to compare against your machine before continuing.
+Las versiones exactas que aparecen abajo son las que realmente exigen `react-native@0.88` y los proyectos nativos de esta app. Se comprobaron contra el campo `engines` de `node_modules/react-native/package.json`, `android/build.gradle`, `android/gradle/wrapper/gradle-wrapper.properties` y `node_modules/react-native/scripts/cocoapods/helpers.rb`, no son aproximaciones. Ejecuta `node -v`, `java -version`, `pod --version`, etc., para comparar con tu máquina antes de continuar.
 
-Common (both platforms):
+Comunes a ambas plataformas:
 
-| Tool | Required version | Check with |
+| Herramienta | Versión requerida | Cómo verificarla |
 | --- | --- | --- |
-| Node.js | `^22.13.0`, `^24.3.0`, or `>=26.0.0` (see note below) | `node -v` |
-| pnpm | Latest ([install guide](https://pnpm.io/installation)) | `pnpm -v` |
-| Git | Any recent version | `git --version` |
+| Node.js | `^22.13.0`, `^24.3.0` o `>=26.0.0` (ver nota abajo) | `node -v` |
+| pnpm | La última ([guía de instalación](https://pnpm.io/installation)) | `pnpm -v` |
+| Git | Cualquier versión reciente | `git --version` |
 
-> **Node version note:** if `node -v` doesn't satisfy the range above, install a matching version
-> with [nvm](https://github.com/nvm-sh/nvm) or [Volta](https://volta.sh/) rather than changing your
-> system-wide Node — `nvm install 22.13.0 && nvm use 22.13.0` (or any version in the same major line)
-> is enough just for this project.
+> **Nota sobre la versión de Node:** si `node -v` no cumple el rango de arriba, instala una versión compatible con [nvm](https://github.com/nvm-sh/nvm) o [Volta](https://volta.sh/) en lugar de cambiar el Node del sistema. `nvm install 22.13.0 && nvm use 22.13.0` (o cualquier versión de la misma línea mayor) basta para este proyecto.
 
 Android:
 
-| Tool | Required version | Check with |
+| Herramienta | Versión requerida | Cómo verificarla |
 | --- | --- | --- |
-| JDK | 17 (required to run Gradle 9.4.1) | `java -version` |
-| Android Studio | Latest stable (bundles the Android SDK and an emulator) | — |
-| Android SDK Platform | API 37 (`compileSdk`); API 36 (`targetSdk`); API 24 minimum (`minSdk`) — installed automatically by Android Studio's SDK Manager the first time you open the project | — |
-| Android NDK | Any version. Gradle downloads the default one on the first build if none is installed (or install "NDK (Side by side)" from SDK Manager) | `ls $ANDROID_HOME/ndk` |
-| Gradle | 9.4.1 (downloaded automatically by the Gradle wrapper; do not install separately) | — |
+| JDK | 17 (necesario para ejecutar Gradle 9.4.1) | `java -version` |
+| Android Studio | La última estable (incluye el SDK de Android y un emulador) | — |
+| Plataforma del SDK de Android | API 37 (`compileSdk`); API 36 (`targetSdk`); API 24 mínimo (`minSdk`). Android Studio la instala con su SDK Manager la primera vez que abres el proyecto | — |
+| NDK de Android | Cualquier versión. Gradle descarga la predeterminada en el primer build si no hay ninguna instalada (o instálala con "NDK (Side by side)" desde el SDK Manager) | `ls $ANDROID_HOME/ndk` |
+| Gradle | 9.4.1 (lo descarga el wrapper de Gradle; no lo instales por separado) | — |
 
-Set the `ANDROID_HOME` environment variable to your Android SDK folder and add `platform-tools` and
-`emulator` to your `PATH`. Android Studio's default SDK locations are:
+Define la variable de entorno `ANDROID_HOME` con la carpeta de tu SDK de Android, y agrega `platform-tools` y `emulator` a tu `PATH`. Estas son las rutas por defecto de Android Studio:
 
-- **macOS:** `$HOME/Library/Android/sdk`. Add to `~/.zshrc`:
+- **macOS:** `$HOME/Library/Android/sdk`. Agrega a `~/.zshrc`:
   ```bash
   export ANDROID_HOME=$HOME/Library/Android/sdk
   export PATH=$PATH:$ANDROID_HOME/platform-tools:$ANDROID_HOME/emulator
   ```
-- **Linux:** `$HOME/Android/Sdk`. Add the same lines to `~/.bashrc` or `~/.zshrc` with that path.
-- **Windows:** `%LOCALAPPDATA%\Android\Sdk`. Set `ANDROID_HOME` in the system environment variables and
-  add `platform-tools` and `emulator` to `Path`.
+- **Linux:** `$HOME/Android/Sdk`. Agrega las mismas líneas a `~/.bashrc` o `~/.zshrc`, con esa ruta.
+- **Windows:** `%LOCALAPPDATA%\Android\Sdk`. Define `ANDROID_HOME` en las variables de entorno del sistema y agrega `platform-tools` y `emulator` a `Path`.
 
-Open a new terminal after changing these. `android/local.properties` is machine-specific and
-git-ignored: Android Studio creates it when you open the project, and Gradle reads `ANDROID_HOME`
-when it does not exist.
+Abre una terminal nueva después de cambiarlas. `android/local.properties` depende de la máquina y está en `.gitignore`: Android Studio lo crea al abrir el proyecto, y mientras no exista, Gradle usa `ANDROID_HOME`.
 
-iOS (macOS only):
+iOS (solo macOS):
 
-| Tool | Required version | Check with |
+| Herramienta | Versión requerida | Cómo verificarla |
 | --- | --- | --- |
-| Xcode | `16.1` or newer | `xcodebuild -version` |
-| iOS deployment target | `15.1` minimum (set automatically by the Podfile; simulators/devices below this are not supported) | — |
-| CocoaPods | `1.13` or newer (not `1.15.0`/`1.15.1`, excluded by the `Gemfile`) | `pod --version` |
-| Ruby | `2.6.10` or newer (see `Gemfile`) | `ruby -v` |
+| Xcode | `16.1` o más reciente | `xcodebuild -version` |
+| Versión mínima de iOS | `15.1` (la fija el Podfile; los simuladores o dispositivos anteriores no son compatibles) | — |
+| CocoaPods | `1.13` o más reciente (no `1.15.0` ni `1.15.1`, que excluye el `Gemfile`) | `pod --version` |
+| Ruby | `2.6.10` o más reciente (ver `Gemfile`) | `ruby -v` |
 
-Follow the official [React Native environment setup](https://reactnative.dev/docs/set-up-your-environment) (React Native CLI tab) for first-time Android Studio / Xcode installation steps.
+Para la instalación inicial de Android Studio y Xcode, sigue la [guía oficial de React Native](https://reactnative.dev/docs/set-up-your-environment) (pestaña React Native CLI).
 
-## 1. Get a TMDB token
+## 1. Obtén un token de TMDB
 
-1. Create a free account at [themoviedb.org](https://www.themoviedb.org/signup).
-2. Go to **Settings → API** and request an API key (free).
-3. Copy the **API Read Access Token** (the long token, not the short API key).
+1. Crea una cuenta gratuita en [themoviedb.org](https://www.themoviedb.org/signup).
+2. Ve a **Configuración → API** y solicita una clave de API (gratuita).
+3. Copia el **API Read Access Token** (el token largo, no la clave corta).
 
-## 2. Configure environment variables
+## 2. Configura las variables de entorno
 
 ```bash
 cp .env.example .env
 ```
 
-Edit `.env` and set your token (the base URL is already filled in `.env.example`):
+Edita `.env` y pon tu token (la URL base ya viene en `.env.example`):
 
 ```
 TMDB_BASE_URL=https://api.themoviedb.org/3
-TMDB_ACCESS_TOKEN=your_api_read_access_token
+TMDB_ACCESS_TOKEN=tu_read_access_token
 ```
 
-`.env` is git-ignored and must never be committed. The app validates the variables at startup and fails with a clear error if one is missing.
+`.env` está en `.gitignore` y nunca debe subirse al repositorio. La app valida las variables al iniciar y muestra un error claro si falta alguna.
 
-> After changing `.env`, rebuild the app (not just reload): the values are embedded at build time.
+> Después de cambiar `.env`, reconstruye la app (no basta con recargarla): los valores se incrustan al compilar.
 
-## 3. Install dependencies
+## 3. Instala las dependencias
 
 ```bash
 pnpm install
 ```
 
-pnpm requires hoisted dependencies for React Native's Gradle setup (it hardcodes a flat
-`node_modules` layout, e.g. `android/settings.gradle`'s `includeBuild("../node_modules/@react-native/gradle-plugin")`).
-This is set as `nodeLinker: hoisted` in `pnpm-workspace.yaml` — **that file, not `.npmrc`**, is
-what pnpm actually reads for this setting once `pnpm-workspace.yaml` exists (confirmed: pnpm
-12.x silently ignores `.npmrc`'s `node-linker` in that case). Do not remove the `nodeLinker` line
-from `pnpm-workspace.yaml`. If you ever see a Gradle error like `Included build
-'.../node_modules/@react-native/gradle-plugin' does not exist`, this setting was lost or
-overridden — run `rm -rf node_modules && pnpm install` after confirming it's still there.
+pnpm necesita dependencias planas (hoisted) para la configuración de Gradle de React Native, que espera un layout plano de `node_modules` (por ejemplo, `includeBuild("../node_modules/@react-native/gradle-plugin")` en `android/settings.gradle`).
+Esto se configura con `nodeLinker: hoisted` en `pnpm-workspace.yaml`. **Ese archivo, no `.npmrc`**, es el que pnpm lee para esta opción cuando existe `pnpm-workspace.yaml` (pnpm 12.x ignora en silencio el `node-linker` de `.npmrc` en ese caso). No elimines la línea `nodeLinker` de `pnpm-workspace.yaml`. Si aparece un error de Gradle como `Included build '.../node_modules/@react-native/gradle-plugin' does not exist`, esa configuración se perdió o se sobrescribió: confírmala y luego ejecuta `rm -rf node_modules && pnpm install`.
 
-iOS only — install the native pods:
+Solo en iOS, instala los pods nativos:
 
 ```bash
 cd ios && pod install && cd ..
 ```
 
-Re-run `pod install` every time a dependency with native code is added or updated.
+Vuelve a ejecutar `pnpm install` (y `pod install` en iOS) cada vez que agregues o actualices una dependencia con código nativo.
 
-## 4. Run the app
+## 4. Ejecuta la app
 
-Start Metro in one terminal (keep it running):
+Inicia Metro en una terminal y déjala abierta:
 
 ```bash
 pnpm start
 ```
 
-Then, in a second terminal, build and launch on the platform you want:
+Después, en una segunda terminal, compila y lanza en la plataforma que quieras:
 
 ### Android
 
-1. Open an Android emulator from Android Studio's Device Manager, **or** connect a physical
-   device with USB debugging enabled (`adb devices` should list it).
-2. Run:
+1. Abre un emulador de Android desde el Device Manager de Android Studio, **o** conecta un dispositivo físico con la depuración USB activada (`adb devices` debe listarlo).
+2. Ejecuta:
    ```bash
    pnpm android
    ```
-   First run compiles the native project, so expect it to take a few minutes; it installs and
-   launches the app automatically once the build finishes.
+   La primera vez compila el proyecto nativo, así que puede tardar varios minutos. La app se instala y se abre sola cuando termina.
 
-### iOS (macOS only)
+### iOS (solo macOS)
 
-1. No manual simulator step is needed — `pnpm ios` boots the default simulator for you. To target
-   a specific device instead, run `npx react-native run-ios --list-devices` to see the available
-   names, then `pnpm ios -- --simulator="iPhone 16"` (or `--device` for a physical, cabled device).
-2. Run:
+1. No hace falta abrir el simulador a mano: `pnpm ios` inicia el simulador predeterminado. Para usar otro dispositivo, ejecuta `npx react-native run-ios --list-devices` para ver los nombres disponibles y después `pnpm ios -- --simulator="iPhone 16"` (o `--device` para un dispositivo físico conectado por cable).
+2. Ejecuta:
    ```bash
    pnpm ios
    ```
-   First run also builds the native project via Xcode/CocoaPods, so expect it to take a few
-   minutes.
+   La primera vez también compila el proyecto nativo con Xcode y CocoaPods, así que puede tardar varios minutos.
 
-The app must build and run without errors on both platforms. If a native build fails, see
-[Troubleshooting](#troubleshooting) below before re-running.
+La app debe compilar y ejecutarse sin errores en ambas plataformas. Si falla una compilación nativa, revisa la sección [Solución de problemas](#solución-de-problemas) antes de volver a intentarlo.
+
+## Probar el manejo de errores
+
+Esta sección explica cómo comprobar que la app se comporta bien cuando fallan las peticiones a TMDB. No necesitas cambiar tu token ni reconstruir la app.
+
+### Cómo activar la simulación
+
+1. Ejecuta la app en desarrollo (`pnpm start` y después `pnpm ios` o `pnpm android`).
+2. Abre el menú de desarrollo de React Native: **Cmd+D** en el simulador de iOS, **Cmd+M** en el emulador de Android, o sacude el dispositivo.
+3. Elige un item **"Simular: ..."**:
+
+| Modo | Qué pasa con cada petición a TMDB |
+| --- | --- |
+| **Simular: sin conexión** | Falla como error de red, sin código HTTP |
+| **Simular: servidor 500** | Responde HTTP 500 |
+| **Simular: 401** | Responde HTTP 401 (token inválido) |
+| **Simular: fallar 3 y recuperar** | Las siguientes 3 peticiones fallan y después todas funcionan. Sirve para probar Reintentar |
+| **Simular: normal** | Vuelve a las peticiones reales |
+
+El modo se aplica a la siguiente petición, sin recargar la app. Al recargar, la app vuelve a **normal**.
+
+### Qué se ve en pantalla
+
+Cuando una petición falla, la pantalla muestra su estado de error con el mensaje normal (por ejemplo, "No pudimos cargar las películas" o "No pudimos cargar la película") y un botón **Reintentar**. En desarrollo, debajo del mensaje aparece además una línea gris `[dev]` que indica el tipo de fallo:
+
+| Modo | Línea `[dev]` que debe aparecer |
+| --- | --- |
+| Sin conexión | `[dev] sin conexión` |
+| Servidor 500 | `[dev] HTTP 500` |
+| 401 | `[dev] HTTP 401` |
+
+La línea `[dev]` no aparece en producción.
+
+### Pasos para probar
+
+**Importante:** las pantallas usan caché. Un error solo se ve si la app pide datos nuevos. Si ya tienes el listado o los géneros cargados, cambiar de modo no provoca nada hasta que pidas algo que no está en caché:
+
+- **Para el listado:** escribe un término de búsqueda que no hayas buscado antes (por ejemplo, `dune`). La búsqueda muestra el error inline, con su `[dev]`.
+- **Para el detalle:** abre una película que no hayas abierto antes en la sesión.
+- **Para "fallar 3 y recuperar":** con el modo activo, busca un término nuevo. La primera petición falla y aparece el error. Pulsa **Reintentar** tres veces: las tres primeras fallan y la cuarta carga los resultados.
+
+Una vez agotados los tres fallos del modo "fallar 3", las siguientes peticiones funcionan aunque sigas en ese modo. Para volver a probarlo, elige el modo de nuevo.
+
+### Resultados esperados
+
+| Prueba | Resultado |
+| --- | --- |
+| Sin conexión, primera carga del listado | Estado de error con `[dev] sin conexión`, y Reintentar funciona al volver al modo normal |
+| Servidor 500 al abrir un detalle nuevo | "No pudimos cargar la película" con `[dev] HTTP 500` |
+| 401 al buscar un término nuevo | Estado de error con `[dev] HTTP 401` |
+| Fallar 3 y recuperar | Tres errores seguidos con Reintentar, y después los datos |
+| Película inexistente (404) | "No encontramos esta película." con Volver, sin Reintentar. **El simulador no genera 404**: esta respuesta solo se prueba con las pruebas automáticas |
+| Error al cargar la página siguiente del listado | Aparece "No se pudieron cargar más películas" con Reintentar, sin línea `[dev]` |
+
+### Límites de la simulación
+
+- Los fallos se generan en el cliente, antes de salir a la red. No se simulan timeouts ni conexiones que se caen a mitad de una respuesta.
+- No hay modo para 404. Esa respuesta está cubierta por las pruebas automáticas.
+- La simulación solo está activa cuando `__DEV__` es verdadero (`src/vendors/dev-error-simulator`, spec `specs/004-dev-error-simulation`).
+
+### Pruebas automáticas del manejo de errores
+
+Las mismas reglas están cubiertas por pruebas automáticas, sin necesidad de un dispositivo:
+
+```bash
+pnpm test -- src/vendors/dev-error-simulator   # modos de simulación, interceptor y menú
+pnpm test -- src/vendors/react-query            # overlays globales según las flags de cada consulta
+pnpm test -- src/features/movies/screens         # estados del listado, búsqueda y paginación
+pnpm test -- src/features/movie-detail           # estados del detalle, incluido el 404
+pnpm test -- src/utils/describe-error            # etiquetas [dev]
+```
 
 ## Scripts
 
-| Script | Description |
+| Script | Descripción |
 | --- | --- |
-| `pnpm start` | Start the Metro bundler |
-| `pnpm android` | Build and run on Android |
-| `pnpm ios` | Build and run on iOS |
-| `pnpm test` | Run tests with coverage |
-| `pnpm test:watch` | Run tests in watch mode |
-| `pnpm test:ci` | Tests with coverage for CI (`--detectOpenHandles --forceExit`) |
-| `pnpm coverage` | Coverage report |
+| `pnpm start` | Inicia el bundler Metro |
+| `pnpm android` | Compila y ejecuta en Android |
+| `pnpm ios` | Compila y ejecuta en iOS |
+| `pnpm test` | Ejecuta las pruebas con cobertura |
+| `pnpm test:watch` | Ejecuta las pruebas en modo observador |
+| `pnpm test:ci` | Pruebas con cobertura para CI (`--detectOpenHandles --forceExit`) |
+| `pnpm coverage` | Informe de cobertura |
 | `pnpm lint` | ESLint |
-| `pnpm lint:check` | ESLint (no auto-fix, fails on warnings) |
-| `pnpm types` | TypeScript check (`tsc --noEmit`) |
-| `pnpm pr:check` | `lint:check` + `types` + `test` (must pass before opening a PR) |
+| `pnpm lint:check` | ESLint (sin autocorrección, falla con advertencias) |
+| `pnpm types` | Verificación de TypeScript (`tsc --noEmit`) |
+| `pnpm pr:check` | `lint:check` + `types` + `test` (debe pasar antes de abrir un PR) |
 
-## Troubleshooting
+## Solución de problemas
 
-- **Metro cache issues:** `pnpm start --reset-cache`
-- **Android build fails after dependency changes:** `cd android && ./gradlew clean && cd ..`
-- **"SDK location not found":** `ANDROID_HOME` is not set in the terminal running `pnpm android`. Set it as shown in Prerequisites, open a new terminal, and run `echo $ANDROID_HOME` to confirm it prints the SDK path.
-- **iOS build fails after dependency changes:** `cd ios && pod install --repo-update && cd ..`
-- **"Missing environment variable" at startup:** check that `.env` exists, contains `TMDB_BASE_URL` and `TMDB_ACCESS_TOKEN`, and that you rebuilt the app.
-- **TMDB returns 401:** the token is wrong or you used the short API key instead of the Read Access Token.
+- **Problemas con la caché de Metro:** `pnpm start --reset-cache`
+- **Falla el build de Android después de cambiar dependencias:** `cd android && ./gradlew clean && cd ..`
+- **"SDK location not found":** `ANDROID_HOME` no está definido en la terminal donde ejecutas `pnpm android`. Defínelo como se indica en Requisitos previos, abre una terminal nueva y ejecuta `echo $ANDROID_HOME` para confirmar que imprime la ruta del SDK.
+- **Falla el build de iOS después de cambiar dependencias:** `cd ios && pod install --repo-update && cd ..`
+- **"Missing environment variable" al iniciar:** revisa que exista `.env`, que contenga `TMDB_BASE_URL` y `TMDB_ACCESS_TOKEN`, y que hayas reconstruido la app.
+- **El valor de `.env` no se refleja en la app:** los valores se incrustan al compilar. Reconstruye con `pnpm android` o `pnpm ios`; recargar o reiniciar Metro no basta.
+- **TMDB responde 401:** el token es incorrecto, o usaste la clave corta de API en lugar del Read Access Token.

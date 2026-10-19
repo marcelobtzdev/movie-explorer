@@ -15,6 +15,22 @@ describe('Component: ErrorState', () => {
     expect(screen.getByRole('button', { name: 'Reintentar' })).toBeTruthy();
   });
 
+  test('should show the development label when debugDetail is provided', async () => {
+    // Act
+    await render(<ErrorState debugDetail="HTTP 500" message="msg" onRetry={jest.fn()} title="title" />);
+
+    // Assert — jest runs with __DEV__ true
+    expect(screen.getByText('[dev] HTTP 500')).toBeTruthy();
+  });
+
+  test('should not show a development label when debugDetail is absent', async () => {
+    // Act
+    await render(<ErrorState message="msg" onRetry={jest.fn()} title="title" />);
+
+    // Assert
+    expect(screen.queryByText(/\[dev\]/)).toBeNull();
+  });
+
   test('should call onRetry when the action is pressed', async () => {
     // Arrange
     const onRetry = jest.fn();

@@ -23,6 +23,11 @@ describe('Vendor: tmdbClient', () => {
       expect(tmdbClient.defaults.headers.Authorization).toBe('Bearer test-token');
     });
 
+    test('should send Accept application/json on every request', () => {
+      // Assert
+      expect(tmdbClient.defaults.headers.Accept).toBe('application/json');
+    });
+
     test('should set the baseURL from env.TMDB_BASE_URL', () => {
       // Assert
       expect(tmdbClient.defaults.baseURL).toBe('https://api.themoviedb.org/3');

@@ -161,6 +161,7 @@ describe('Screen: MovieDetailScreen', () => {
 
       // Assert
       expect(screen.getByText('No pudimos cargar la película')).toBeTruthy();
+      expect(screen.getByText('[dev] sin conexión')).toBeTruthy();
 
       // Act
       await fireEvent.press(screen.getByRole('button', { name: 'Reintentar' }));

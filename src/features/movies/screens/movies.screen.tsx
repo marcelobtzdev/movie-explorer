@@ -16,6 +16,7 @@ import { getGenreNames, useMovieGenres } from '@/src/features/genres';
 import { ROUTES } from '@/src/navigation/routes';
 import type { MoviesScreenProps } from '@/src/navigation/navigation.types';
 import { designSystem } from '@/src/theme';
+import { describeErrorForDev } from '@/src/utils/describe-error.utils';
 import { buildTmdbImageUrl, prefetchTmdbImage } from '@/src/utils/tmdb-image.utils';
 import { FlashList } from '@shopify/flash-list';
 import { useNavigation } from '@react-navigation/native';
@@ -208,6 +209,7 @@ export function MoviesScreen() {
           <View style={styles.centeredArea}>
             {isInitialError ? (
               <ErrorState
+                debugDetail={describeErrorForDev(genresQuery.isError ? genresQuery.error : activeQuery.error)}
                 message={MOVIES_STRINGS.initialErrorMessage}
                 onRetry={handleRetryInitial}
                 title={MOVIES_STRINGS.initialErrorTitle}

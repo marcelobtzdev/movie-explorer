@@ -1,7 +1,9 @@
 <!--
 Sync Impact Report
 ==================
-Version change: 1.4.0 → 1.5.0
+Version change: 1.5.0 → 1.6.0
+Added:
+  - Development error simulation (004-dev-error-simulation), dev only, under `vendors/`.
 Changed:
   - Error overlays are global by default (Principle IX): network and server errors show the overlays
     from the QueryClient; a query whose screen renders its own error state sets the skip flags.
@@ -607,6 +609,7 @@ APIs behind a stable interface, and ease testing and future swaps.
 | `vendors/react-query/ReactQueryProvider.tsx` | `QueryClientProvider` | Provider component |
 | `vendors/netinfo/index.ts` | `@react-native-community/netinfo` | Connectivity subscription used by `useNetworkStatus` |
 | `vendors/react-navigation/ReactNavigationProvider.tsx` | `@react-navigation/native` | `NavigationContainer` + theme provider |
+| `vendors/dev-error-simulator/` | `axios` (dev only) | Development-only simulation of TMDB failures (network, 500, 401, fail-three-and-recover) from the React Native dev menu; attached only when `__DEV__` (spec 004) |
 | `vendors/linear-gradient/index.ts` | `react-native-linear-gradient` | `LinearGradient` used by the featured card overlay and the skeleton shimmer |
 | `vendors/reactotron/index.ts` | `reactotron-react-native` | Dev-only Reactotron instance (imported only inside `__DEV__`) |
 
@@ -946,4 +949,4 @@ redefining a principle, MINOR for adding a principle or materially expanding gui
 (Constitution Check), by `/speckit-analyze` (a constitution conflict is CRITICAL), and in code
 review. Violations require explicit justification in the plan's Complexity Tracking table.
 
-**Version**: 1.5.0 | **Ratified**: 2026-10-17 | **Last Amended**: 2026-10-19
+**Version**: 1.6.0 | **Ratified**: 2026-10-17 | **Last Amended**: 2026-10-19
