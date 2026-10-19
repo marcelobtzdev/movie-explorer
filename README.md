@@ -57,7 +57,7 @@ Versions are the ones pinned in `package.json`.
 | Jest | `@react-native/jest-preset` + `@testing-library/react-native`, v8 coverage, tests colocated with the code, `react-native-config` mocked |
 | Husky | `pre-commit`: `lint-staged` (ESLint `--fix` on staged JS/TS, Prettier on staged JSON/MD). `pre-push`: `commitlint` over the commits being pushed, then `pnpm pr:check` |
 | commitlint | `@commitlint/config-conventional` (header max 150 chars, body lines max 100) |
-| Babel | `module-resolver` (`@/src` alias), `transform-remove-console` in production builds, Reanimated plugin last |
+| Babel | `module-resolver` (`@/src` alias), `transform-remove-console` in production builds, Zod export-namespace transform first, worklets plugin last (Reanimated 4) |
 
 ### Project structure
 
@@ -241,8 +241,6 @@ The app must build and run without errors on both platforms. If a native build f
 
 - **Metro cache issues:** `pnpm start --reset-cache`
 - **Android build fails after dependency changes:** `cd android && ./gradlew clean && cd ..`
-- **"NDK ... did not have a source.properties file":** an NDK folder under `$ANDROID_HOME/ndk/` is incomplete (an interrupted install). Delete that folder and run `pnpm android` again, or reinstall the NDK from Android Studio's SDK Manager.
-- **Port 8081 is busy:** `pnpm android` detects it and uses the next free port (for example 8082), passing that port to Gradle and `adb reverse`. You do not need to free the port or change any config.
 - **"SDK location not found":** `ANDROID_HOME` is not set in the terminal running `pnpm android`. Set it as shown in Prerequisites, open a new terminal, and run `echo $ANDROID_HOME` to confirm it prints the SDK path.
 - **iOS build fails after dependency changes:** `cd ios && pod install --repo-update && cd ..`
 - **"Missing environment variable" at startup:** check that `.env` exists, contains `TMDB_BASE_URL` and `TMDB_ACCESS_TOKEN`, and that you rebuilt the app.
